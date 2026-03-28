@@ -43,7 +43,7 @@ st.set_page_config(
 @st.cache_data
 def load_data() -> pd.DataFrame:
     # Canonical path: <repo>/outputs/all_predictions.csv
-    csv_path = ROOT / "outputs" / "all_predictions.csv"
+    csv_path = ROOT / "outputs" / "predictions" / "all_predictions.csv"
     if not csv_path.exists():
         st.error(
             f"**all_predictions.csv not found.**\n\n"
