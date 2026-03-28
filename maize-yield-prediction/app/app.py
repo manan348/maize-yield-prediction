@@ -4,7 +4,17 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import sys
+import io
+import datetime
 from pathlib import Path
+
+# ── PDF imports ────────────────────────────────────────
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles    import getSampleStyleSheet
+from reportlab.platypus      import (SimpleDocTemplate,
+                                      Paragraph, Spacer,
+                                      Table, TableStyle)
+from reportlab.lib           import colors
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -38,7 +48,107 @@ def category(y):
     if y >= 150: return "🟡 Medium"
     return "🔴 Low"
 
-# Header
+# ── PDF Report Generator ───────────────────────────────
+def generate_pdf_report(parent1, parent2,
+                         location, pred, loc_results):
+    buffer = io.BytesIO()
+    doc    = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story  = []
+
+    # Title
+    story.append(Paragraph(
+        "Maize Yield Prediction Report",
+        styles['Title']
+    ))
+    story.append(Spacer(1, 12))
+
+    # Date
+    story.append(Paragraph(
+        f"Generated: "
+        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        styles['Normal']
+    ))
+    story.append(Spacer(1, 12))
+
+    # Model info
+    story.append(Paragraph(
+        "Model Performance",
+        styles['Heading2']
+    ))
+    story.append(Paragraph(
+        "CV R² = 0.572  |  Test R² = 0.635  |  "
+        "Samples = 2,867  |  Algorithm = Random Forest",
+        styles['Normal']
+    ))
+    story.append(Spacer(1, 12))
+
+    # Prediction summary table
+    story.append(Paragraph(
+        "Prediction Summary",
+        styles['Heading2']
+    ))
+
+    pred_data = [
+        ['Parameter',      'Value'],
+        ['Female Parent',  parent1],
+        ['Male Parent',    parent2],
+        ['Location',       location],
+        ['Predicted Yield',f'{pred} bu/A'],
+        ['Category',       category(pred).replace("🟢","").replace("🟡","").replace("🔴","").strip()]
+    ]
+
+    table = Table(pred_data, colWidths=[200, 300])
+    table.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1,  0), colors.steelblue),
+        ('TEXTCOLOR',     (0, 0), (-1,  0), colors.white),
+        ('FONTNAME',      (0, 0), (-1,  0), 'Helvetica-Bold'),
+        ('GRID',          (0, 0), (-1, -1), 1, colors.grey),
+        ('ROWBACKGROUNDS',(0, 1), (-1, -1),
+         [colors.white, colors.lightgrey])
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 20))
+
+    # Location comparison table
+    if loc_results:
+        story.append(Paragraph(
+            "All Locations Comparison (Top 10)",
+            styles['Heading2']
+        ))
+
+        loc_data = [['Rank', 'Location', 'Yield (bu/A)', 'Category']]
+        for i, row in enumerate(loc_results[:10], 1):
+            loc_data.append([
+                str(i),
+                row['Location'],
+                str(row['Yield']),
+                category(row['Yield']).replace("🟢","").replace("🟡","").replace("🔴","").strip()
+            ])
+
+        loc_table = Table(loc_data, colWidths=[50, 150, 150, 150])
+        loc_table.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1,  0), colors.steelblue),
+            ('TEXTCOLOR',     (0, 0), (-1,  0), colors.white),
+            ('FONTNAME',      (0, 0), (-1,  0), 'Helvetica-Bold'),
+            ('GRID',          (0, 0), (-1, -1), 1, colors.grey),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1),
+             [colors.white, colors.lightgrey])
+        ]))
+        story.append(loc_table)
+
+    # Footer
+    story.append(Spacer(1, 30))
+    story.append(Paragraph(
+        "Built by Abdul Manan  |  G2F 2017 Dataset  |  Random Forest Model",
+        styles['Normal']
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+# ── Header ─────────────────────────────────────────────
 st.title("🌽 Maize Yield Predictor")
 st.markdown(
     "**AI-powered yield prediction using "
@@ -65,15 +175,16 @@ male     = st.sidebar.selectbox("Male Parent",
                                   males,   index=default_m)
 location = st.sidebar.selectbox("Location", locations)
 
-# Tabs
-tab1, tab2, tab3, tab4 = st.tabs([
+# ── Tabs — added tab_batch as 5th tab ─────────────────
+tab1, tab2, tab3, tab4, tab_batch = st.tabs([
     "🔮 Predict",
     "📍 Best Location",
     "🏆 Best Cross",
-    "🔄 G×E Analysis"
+    "🔄 G×E Analysis",
+    "📦 Batch Predict"
 ])
 
-# TAB 1: Single Prediction
+# ── TAB 1: Single Prediction + PDF Download ────────────
 with tab1:
     st.subheader(
         f"Prediction: {female} × {male} @ {location}"
@@ -117,10 +228,36 @@ with tab1:
         ))
         fig.update_layout(height=350)
         st.plotly_chart(fig, use_container_width=True)
+
+        # ── PDF Download Button ────────────────────────
+        st.markdown("---")
+        loc_results = []
+        for loc in locations:
+            p = lookup(female, male, loc)
+            if p:
+                loc_results.append({
+                    'Location': loc,
+                    'Yield':    p
+                })
+        loc_results.sort(
+            key=lambda x: x['Yield'], reverse=True
+        )
+        pdf_buffer = generate_pdf_report(
+            female, male, location, pred, loc_results
+        )
+        st.download_button(
+            label="📄 Download PDF Report",
+            data=pdf_buffer,
+            file_name=f"yield_report_{female}_{male}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+        # ──────────────────────────────────────────────
+
     else:
         st.warning("Combination not found in database")
 
-# TAB 2: Best Location
+# ── TAB 2: Best Location ───────────────────────────────
 with tab2:
     st.subheader(f"Best Locations for {female} × {male}")
     rows = []
@@ -134,7 +271,9 @@ with tab2:
             })
 
     if rows:
-        res_df = pd.DataFrame(rows)                   .sort_values("Yield", ascending=False)                   .reset_index(drop=True)
+        res_df = pd.DataFrame(rows)\
+                   .sort_values("Yield", ascending=False)\
+                   .reset_index(drop=True)
         res_df.index += 1
 
         best = res_df.iloc[0]
@@ -170,7 +309,7 @@ with tab2:
             f"best_locations_{female}_{male}.csv"
         )
 
-# TAB 3: Best Cross at Location
+# ── TAB 3: Best Cross at Location ─────────────────────
 with tab3:
     st.subheader(f"Top Crosses at {location}")
     top_n = st.slider("Show top N", 5, 50, 20)
@@ -178,7 +317,10 @@ with tab3:
     cross_df = df[df["Location"] == location].copy()
     cross_df["Cross"] = (cross_df["Female"] +
                           " × " + cross_df["Male"])
-    cross_df = cross_df               .sort_values("Yield", ascending=False)               .head(top_n)               .reset_index(drop=True)
+    cross_df = cross_df\
+               .sort_values("Yield", ascending=False)\
+               .head(top_n)\
+               .reset_index(drop=True)
     cross_df.index += 1
 
     fig = px.bar(
@@ -208,7 +350,7 @@ with tab3:
         f"top_crosses_{location}.csv"
     )
 
-# TAB 4: G×E Analysis
+# ── TAB 4: G×E Analysis ───────────────────────────────
 with tab4:
     st.subheader("G×E Interaction Analysis")
 
@@ -265,7 +407,162 @@ with tab4:
             fig2.update_layout(height=400)
             st.plotly_chart(fig2, use_container_width=True)
 
-# Footer
+# ── TAB 5: Batch Predict ──────────────────────────────
+with tab_batch:
+    st.subheader("📦 Batch Yield Prediction")
+    st.markdown(
+        "Upload a CSV with columns: **Female, Male, Location**"
+    )
+
+    # Show sample format
+    sample = pd.DataFrame({
+        'Female':   ['B73', 'A632', 'Oh43'],
+        'Male':     ['Mo17', '3IIH6', 'Mo17'],
+        'Location': ['ILH1', 'WIH1', 'IAH4']
+    })
+    st.markdown("**Sample input format:**")
+    st.dataframe(sample, use_container_width=True)
+
+    # Download template
+    st.download_button(
+        "📥 Download Template CSV",
+        sample.to_csv(index=False),
+        "template.csv",
+        "text/csv"
+    )
+
+    st.markdown("---")
+
+    # Upload CSV
+    uploaded = st.file_uploader(
+        "Upload your CSV file",
+        type=['csv']
+    )
+
+    if uploaded:
+        input_df = pd.read_csv(uploaded)
+        st.markdown(f"**Uploaded: {len(input_df)} rows**")
+        st.dataframe(input_df.head(), use_container_width=True)
+
+        # Validate columns
+        required = ['Female', 'Male', 'Location']
+        missing  = [c for c in required
+                    if c not in input_df.columns]
+
+        if missing:
+            st.error(f"Missing columns: {missing}")
+            st.info("Required columns: Female, Male, Location")
+        else:
+            if st.button("🔮 Predict All",
+                          type="primary",
+                          use_container_width=True):
+
+                results  = []
+                errors   = []
+                progress = st.progress(0)
+                status   = st.empty()
+                total    = len(input_df)
+
+                for i, row in input_df.iterrows():
+                    p1  = str(row['Female']).strip()
+                    p2  = str(row['Male']).strip()
+                    loc = str(row['Location']).strip()
+
+                    p = lookup(p1, p2, loc)
+
+                    if p:
+                        results.append({
+                            'Female':          p1,
+                            'Male':            p2,
+                            'Location':        loc,
+                            'Predicted Yield': p,
+                            'Category':        category(p)
+                        })
+                    else:
+                        errors.append({
+                            'Female':   p1,
+                            'Male':     p2,
+                            'Location': loc,
+                            'Error':    'Not found in database'
+                        })
+
+                    progress.progress((i + 1) / total)
+                    status.text(f"Processing {i+1}/{total}...")
+
+                progress.empty()
+                status.empty()
+
+                if results:
+                    res_df = pd.DataFrame(results)\
+                               .sort_values(
+                                   'Predicted Yield',
+                                   ascending=False
+                               ).reset_index(drop=True)
+                    res_df.index += 1
+
+                    st.success(
+                        f"✅ {len(results)} predictions completed"
+                    )
+                    if errors:
+                        st.warning(
+                            f"⚠️ {len(errors)} rows not found in database"
+                        )
+
+                    # Results table
+                    st.dataframe(res_df, use_container_width=True)
+
+                    # Summary metrics
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric(
+                        "Best Yield",
+                        f"{res_df['Predicted Yield'].max():.1f} bu/A"
+                    )
+                    col2.metric(
+                        "Average Yield",
+                        f"{res_df['Predicted Yield'].mean():.1f} bu/A"
+                    )
+                    col3.metric(
+                        "Worst Yield",
+                        f"{res_df['Predicted Yield'].min():.1f} bu/A"
+                    )
+
+                    # Distribution chart
+                    fig = px.histogram(
+                        res_df,
+                        x='Predicted Yield',
+                        nbins=20,
+                        title='Yield Distribution of Batch Results',
+                        color_discrete_sequence=['steelblue'],
+                        template='plotly_white'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Download results
+                    st.download_button(
+                        "📥 Download Results CSV",
+                        res_df.to_csv(index=False),
+                        "batch_predictions.csv",
+                        "text/csv",
+                        use_container_width=True
+                    )
+
+                    # Show failed rows
+                    if errors:
+                        with st.expander(
+                            f"❌ {len(errors)} failed rows — click to view"
+                        ):
+                            st.dataframe(
+                                pd.DataFrame(errors),
+                                use_container_width=True
+                            )
+                else:
+                    st.error(
+                        "❌ No predictions found. "
+                        "Check that your Female/Male/Location "
+                        "values match the database."
+                    )
+
+# ── Footer ─────────────────────────────────────────────
 st.markdown("---")
 st.markdown(
     "Built with G2F 2017 | Random Forest | "
