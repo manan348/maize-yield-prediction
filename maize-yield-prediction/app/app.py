@@ -14,6 +14,15 @@ from reportlab.platypus      import (SimpleDocTemplate, Paragraph,
                                       Spacer, Table, TableStyle)
 from reportlab.lib           import colors
 
+# ── Repo-root resolution ───────────────────────────────────────
+# app.py lives at:  <repo>/app/app.py
+# CSV lives at:     <repo>/outputs/all_predictions.csv
+# src lives at:     <repo>/src/
+import sys
+ROOT = Path(__file__).resolve().parents[1]   # repo root
+if str(ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(ROOT / "src"))
+
 # ── Constants — update these after every model retrain ────────
 CV_R2_NORM   = 0.212   # normalized yield metric
 CV_R2_RAW    = 0.62    # equivalent raw yield metric (reported to users)
@@ -32,17 +41,19 @@ st.set_page_config(
 
 # ── Data loading ───────────────────────────────────────────────
 @st.cache_data
-def load_data():
-    # Works both locally (app.py next to CSV) and on Streamlit Cloud
-    for candidate in [
-        Path(__file__).parent / "all_predictions.csv",
-        Path(__file__).parent / "outputs" / "predictions" / "all_predictions.csv",
-        Path("all_predictions.csv"),
-    ]:
-        if candidate.exists():
-            return pd.read_csv(candidate)
-    st.error("all_predictions.csv not found. Check your repo structure.")
-    st.stop()
+def load_data() -> pd.DataFrame:
+    # Canonical path: <repo>/outputs/all_predictions.csv
+    csv_path = ROOT / "outputs" / "all_predictions.csv"
+    if not csv_path.exists():
+        st.error(
+            f"**all_predictions.csv not found.**\n\n"
+            f"Expected location: `outputs/all_predictions.csv` "
+            f"(relative to repo root).\n\n"
+            f"Run Cell 35 → Cell 36 in Colab to generate it, "
+            f"then push to GitHub."
+        )
+        st.stop()
+    return pd.read_csv(csv_path)
 
 df = load_data()
 
