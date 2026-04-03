@@ -54,21 +54,73 @@ st.markdown("""
     display: inline-block; background: rgba(74,222,128,0.15); border: 1px solid rgba(74,222,128,0.3);
     color: #4ade80; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em;
     padding: 3px 10px; border-radius: 20px; margin-right: 6px; margin-top: 12px; text-transform: uppercase;
+    cursor: default; transition: all 0.25s ease;
   }
-  .kpi { background: #f8fdf9; border: 1px solid #d1fae5; border-radius: 14px; padding: 18px 16px; text-align: center; }
+  .hero .tag:hover {
+    background: rgba(74,222,128,0.28); border-color: rgba(74,222,128,0.6);
+    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(74,222,128,0.2);
+  }
+  .kpi {
+    background: transparent;
+    border: 1px solid rgba(20,83,45,0.18);
+    border-radius: 14px; padding: 18px 16px; text-align: center;
+    transition: all 0.25s ease; cursor: default;
+    backdrop-filter: blur(4px);
+  }
+  .kpi:hover {
+    border-color: rgba(34,197,94,0.5);
+    box-shadow: 0 4px 20px rgba(34,197,94,0.12);
+    transform: translateY(-3px);
+  }
   .kpi .v { font-size: 1.9rem; font-weight: 600; color: #14532d; font-family: 'Fraunces', serif; }
   .kpi .l { font-size: 0.72rem; color: #4b7a5e; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
-  .info-pill { background: #f0fdf4; border-left: 3px solid #22c55e; border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0; font-size: 0.89rem; color: #14532d; line-height: 1.6; }
-  .warn-pill  { background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0; font-size: 0.89rem; color: #78350f; }
-  .compare-card { background: white; border: 1px solid #e5f3eb; border-radius: 14px; padding: 20px; text-align: center; }
+  .info-pill {
+    background: transparent;
+    border-left: 3px solid #22c55e;
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0;
+    font-size: 0.89rem; color: #14532d; line-height: 1.6;
+    transition: border-color 0.2s, padding-left 0.2s;
+  }
+  .info-pill:hover { border-left-width: 5px; padding-left: 18px; }
+  .warn-pill {
+    background: transparent;
+    border-left: 3px solid #f59e0b;
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0;
+    font-size: 0.89rem; color: #78350f;
+    transition: border-color 0.2s, padding-left 0.2s;
+  }
+  .warn-pill:hover { border-left-width: 5px; padding-left: 18px; }
+  .compare-card {
+    background: transparent;
+    border: 1px solid rgba(229,243,235,0.6);
+    border-radius: 14px; padding: 20px; text-align: center;
+    transition: all 0.25s ease;
+    backdrop-filter: blur(4px);
+  }
+  .compare-card:hover {
+    border-color: rgba(34,197,94,0.4);
+    box-shadow: 0 6px 24px rgba(34,197,94,0.1);
+    transform: translateY(-3px);
+  }
   .compare-card .hn  { font-family: 'Fraunces', serif; font-size: 1.1rem; color: #14532d; font-weight: 600; }
   .compare-card .yb  { font-size: 2.4rem; font-weight: 700; font-family: 'Fraunces', serif; }
   .compare-card .yu  { font-size: 0.85rem; color: #6b7280; }
-  .about-section { background: #f8fdf9; border-radius: 14px; padding: 24px 28px; margin: 12px 0; }
+  .about-section {
+    background: transparent;
+    border: 1px solid rgba(20,83,45,0.12);
+    border-radius: 14px; padding: 24px 28px; margin: 12px 0;
+    transition: all 0.25s ease;
+    backdrop-filter: blur(4px);
+  }
+  .about-section:hover {
+    border-color: rgba(34,197,94,0.35);
+    box-shadow: 0 4px 18px rgba(34,197,94,0.08);
+  }
   .about-section h4 { font-family: 'Fraunces', serif; color: #14532d; margin-bottom: 8px; }
-  .stTabs [data-baseweb="tab-list"] { gap: 4px; background: #f0fdf4; border-radius: 10px; padding: 4px; }
-  .stTabs [data-baseweb="tab"] { border-radius: 8px; padding: 7px 16px; font-weight: 500; font-size: 0.85rem; }
-  .stTabs [aria-selected="true"] { background: white !important; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  .stTabs [data-baseweb="tab-list"] { gap: 4px; background: transparent; border-radius: 10px; padding: 4px; border: 1px solid rgba(20,83,45,0.1); }
+  .stTabs [data-baseweb="tab"] { border-radius: 8px; padding: 7px 16px; font-weight: 500; font-size: 0.85rem; transition: all 0.2s; }
+  .stTabs [data-baseweb="tab"]:hover { background: rgba(74,222,128,0.08) !important; }
+  .stTabs [aria-selected="true"] { background: rgba(74,222,128,0.15) !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -568,15 +620,6 @@ with tab10:
           Locations = 38<br>
           Hybrids = 2,912<br>
           Years = 5
-        </div>
-        <div class="about-section">
-          <h4>Roadmap</h4>
-          ✅ Multi-year model<br>
-          ✅ 2.99M predictions<br>
-          ⬜ FastAPI endpoint<br>
-          ⬜ Soybean pipeline<br>
-          ⬜ Breeding recommender<br>
-          ⬜ B2B API customers
         </div>
         """, unsafe_allow_html=True)
 
