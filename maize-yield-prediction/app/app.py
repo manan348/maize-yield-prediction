@@ -68,72 +68,74 @@ st.markdown("""
 
   /* ── KPI cards ── */
   .kpi {
-    background: #f0fdf4;
-    border: 1.5px solid #bbf7d0;
+    background: #0d2218;
+    border: 1.5px solid #1a4d2e;
     border-radius: 14px; padding: 18px 16px; text-align: center;
     transition: all 0.25s ease; cursor: default;
   }
   .kpi:hover {
-    background: #dcfce7;
+    background: #112b1e;
     border-color: #22c55e;
-    box-shadow: 0 6px 22px rgba(34,197,94,0.18);
+    box-shadow: 0 6px 22px rgba(34,197,94,0.2);
     transform: translateY(-3px);
   }
-  .kpi .v { font-size: 1.9rem; font-weight: 700; color: #14532d; font-family: 'Fraunces', serif; }
-  .kpi .l { font-size: 0.72rem; color: #166534; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 4px; font-weight: 500; }
+  .kpi .v { font-size: 1.9rem; font-weight: 700; color: #4ade80; font-family: 'Fraunces', serif; }
+  .kpi .l { font-size: 0.72rem; color: #86efac; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 4px; font-weight: 500; }
 
   /* ── Info / Warn pills ── */
   .info-pill {
-    background: #f0fdf4;
+    background: #0a1f12;
     border-left: 4px solid #22c55e;
     border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 10px 0;
-    font-size: 0.89rem; color: #14532d; line-height: 1.7; font-weight: 400;
+    font-size: 0.89rem; color: #d1fae5; line-height: 1.7; font-weight: 400;
     transition: border-left-width 0.2s, padding-left 0.2s, background 0.2s;
   }
-  .info-pill:hover { border-left-width: 6px; padding-left: 22px; background: #dcfce7; }
+  .info-pill strong { color: #4ade80; }
+  .info-pill:hover { border-left-width: 6px; padding-left: 22px; background: #0d2218; }
 
   .warn-pill {
-    background: #fffbeb;
+    background: #1a1200;
     border-left: 4px solid #f59e0b;
     border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 10px 0;
-    font-size: 0.89rem; color: #78350f; line-height: 1.7; font-weight: 400;
+    font-size: 0.89rem; color: #fde68a; line-height: 1.7; font-weight: 400;
     transition: border-left-width 0.2s, padding-left 0.2s, background 0.2s;
   }
-  .warn-pill:hover { border-left-width: 6px; padding-left: 22px; background: #fef3c7; }
+  .warn-pill:hover { border-left-width: 6px; padding-left: 22px; background: #221800; }
 
   /* ── Compare cards ── */
   .compare-card {
-    background: #f8fdf9;
-    border: 1.5px solid #d1fae5;
+    background: #0d2218;
+    border: 1.5px solid #1a4d2e;
     border-radius: 14px; padding: 20px; text-align: center;
     transition: all 0.25s ease;
   }
   .compare-card:hover {
-    background: #ecfdf5;
+    background: #112b1e;
     border-color: #22c55e;
-    box-shadow: 0 6px 24px rgba(34,197,94,0.15);
+    box-shadow: 0 6px 24px rgba(34,197,94,0.2);
     transform: translateY(-3px);
   }
-  .compare-card .hn { font-family: 'Fraunces', serif; font-size: 1.1rem; color: #14532d; font-weight: 700; }
-  .compare-card .yb { font-size: 2.4rem; font-weight: 700; font-family: 'Fraunces', serif; color: #166534; }
-  .compare-card .yu { font-size: 0.85rem; color: #4b7a5e; font-weight: 500; }
+  .compare-card .hn { font-family: 'Fraunces', serif; font-size: 1.1rem; color: #a7f3c0; font-weight: 700; }
+  .compare-card .yb { font-size: 2.4rem; font-weight: 700; font-family: 'Fraunces', serif; color: #4ade80; }
+  .compare-card .yu { font-size: 0.85rem; color: #86efac; font-weight: 500; }
 
   /* ── About sections ── */
   .about-section {
-    background: #f8fdf9;
-    border: 1.5px solid #d1fae5;
+    background: #0d2218;
+    border: 1.5px solid #1a4d2e;
     border-radius: 14px; padding: 24px 28px; margin: 12px 0;
     transition: all 0.25s ease;
   }
   .about-section:hover {
-    background: #ecfdf5;
+    background: #112b1e;
     border-color: #22c55e;
-    box-shadow: 0 4px 18px rgba(34,197,94,0.12);
+    box-shadow: 0 4px 20px rgba(34,197,94,0.15);
   }
-  .about-section h4 { font-family: 'Fraunces', serif; color: #14532d; margin-bottom: 10px; font-size: 1.05rem; font-weight: 700; }
-  .about-section p, .about-section br, .about-section strong { color: #1a3d28; line-height: 1.75; }
-  .about-section a { color: #16a34a; font-weight: 600; text-decoration: none; }
-  .about-section a:hover { text-decoration: underline; color: #14532d; }
+  .about-section h4 { font-family: 'Fraunces', serif; color: #4ade80; margin-bottom: 10px; font-size: 1.05rem; font-weight: 700; }
+  .about-section, .about-section p { color: #d1fae5; line-height: 1.75; }
+  .about-section strong { color: #a7f3c0; }
+  .about-section a { color: #4ade80; font-weight: 600; text-decoration: none; }
+  .about-section a:hover { text-decoration: underline; color: #86efac; }
 
   /* ── Tabs ── */
   .stTabs [data-baseweb="tab-list"] {
