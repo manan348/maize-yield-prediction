@@ -1,295 +1,300 @@
-# 🌽 Maize Yield Prediction System
+# 🌽 NeuroCrop — Maize Yield Prediction Platform
 
-> Predict maize grain yield for hybrid crosses across multiple locations using **Random Forest**, **genomic SNPs**, and **environmental + weather features**. Models **G×E (Genotype × Environment) interactions** to guide breeders in selecting optimal parent combinations and growing locations.
+> **Generative breeding platform** that predicts maize hybrid grain yield for any parent cross × location combination using **XGBoost**, **genomic SNPs (VCF)**, and **multi-environment weather + soil features**. Models **G×E (Genotype × Environment) interactions** across 5 years and 38 US field locations to guide breeders in selecting optimal parent combinations before committing to expensive field trials.
+
+**Competitive moat:** Standard genomic tools used by Pioneer and Bayer (GBLUP/BLUP) use pedigree + genomics but ignore real environment data. NeuroCrop ingests actual field-level climate and soil per location — that is the core technical differentiation.
 
 ---
 
-👤 **Author:** Abdul Manan — Plant Breeder | ML/DL Researcher  
+👤 **Author:** Abdul Manan — Plant Breeder | ML/DL Researcher | Generative Breeding  
 📧 [abdulmanan2287@gmail.com](mailto:abdulmanan2287@gmail.com) &nbsp;|&nbsp; 🔗 [LinkedIn](https://www.linkedin.com/in/abdul-manan-0aa546332/) &nbsp;|&nbsp; 💻 [GitHub](https://github.com/manan348)  
-🗓️ **Last Updated:** March 2026
+🌐 **Live App:** [maize-yield-prediction-ryntvaanvvfya8wkdtkkba.streamlit.app](https://maize-yield-prediction-ryntvaanvvfya8wkdtkkba.streamlit.app/)  
+🗓️ **Last Updated:** April 2026
 
 ---
 
 ## 📋 Table of Contents
 
-- [🌽 Maize Yield Prediction System](#-maize-yield-prediction-system)
-  - [📋 Table of Contents](#-table-of-contents)
-  - [🎯 Overview](#-overview)
-  - [📂 Dataset](#-dataset)
-  - [📊 Model Performance](#-model-performance)
-    - [✅ Final Model — v5 (Random Forest)](#-final-model--v5-random-forest)
-  - [🔍 Feature Importance](#-feature-importance)
-  - [🧠 Pipeline Overview](#-pipeline-overview)
-    - [1️⃣ Data Preprocessing](#1️⃣-data-preprocessing)
-    - [2️⃣ Feature Engineering](#2️⃣-feature-engineering)
-    - [3️⃣ Model Training](#3️⃣-model-training)
-    - [4️⃣ Prediction System](#4️⃣-prediction-system)
-  - [🌽 Example Predictions](#-example-predictions)
-    - [Single-Cross Predictions](#single-cross-predictions)
-    - [Top Locations for B73 × Mo17](#top-locations-for-b73--mo17)
-  - [📊 Visualizations](#-visualizations)
-  - [⚙️ Requirements](#️-requirements)
-  - [🚀 Installation](#-installation)
-  - [🖥️ Running Modes](#️-running-modes)
-    - [1) Train mode](#1-train-mode)
-    - [2) Predict mode](#2-predict-mode)
-    - [3) Streamlit app](#3-streamlit-app)
-  - [📦 Artifacts Produced](#-artifacts-produced)
-    - [`outputs/predictions/`](#outputspredictions)
-    - [`outputs/plots/`](#outputsplots)
-  - [📁 Project Structure](#-project-structure)
-  - [📄 License](#-license)
+- [🎯 Overview](#-overview)
+- [📂 Dataset](#-dataset)
+- [📊 Model Performance](#-model-performance)
+- [🔍 Feature Importance](#-feature-importance)
+- [🧠 Pipeline Overview](#-pipeline-overview)
+- [🌽 Example Predictions](#-example-predictions)
+- [📊 Visualizations](#-visualizations)
+- [⚙️ Requirements](#️-requirements)
+- [🚀 Installation](#-installation)
+- [🖥️ Running the App](#️-running-the-app)
+- [📦 Artifacts](#-artifacts)
+- [📁 Project Structure](#-project-structure)
+- [📄 License](#-license)
 
 ---
 
 ## 🎯 Overview
 
-This project builds a **genomic prediction system** for maize grain yield using SNP markers, plant traits, and weather features. The goal is to help breeders identify the **best parent crosses** and **optimal growing locations** before committing to field trials — reducing cost and time-to-insight.
+NeuroCrop builds a **multi-year genomic prediction system** for maize grain yield using SNP markers, plant traits, weather, and soil features across the G2F (Genomes to Fields) public dataset.
 
-The system supports three execution paths:
+**What it does:**
 
-- **Full training pipeline** — runs when the raw H5 genotype file is available
-- **Predict mode** — runs inference from saved model artifacts
-- **Lightweight fallback** — serves precomputed predictions when heavy artifacts or H5 data are missing
+- Predicts yield (bu/A) for any `(female × male, location)` combination from **2,994,894 pre-computed predictions**
+- Ranks hybrids by **G×E stability** (CV% across locations) — wide-adapted vs. location-specific
+- Identifies **best location** for a given cross and **best cross** for a given location
+- Classifies predictions into **High / Medium / Low** yield categories with percentile rank
+- Exports PDF reports and batch predictions (CSV / Excel)
 
-Key capabilities:
+**Key numbers from the latest full run:**
 
-- Predicts yield (bu/A) for any `(female × male, location)` combination
-- Classifies predictions into **High / Medium / Low** categories
-- Models **G×E interactions** across diverse environments
-- Gracefully degrades to fallback mode without user intervention
+| Metric | Value |
+|--------|-------|
+| Training samples | **46,686** hybrid × location observations |
+| Years | **5** (G2F 2014–2018) |
+| Locations | **38** US field locations |
+| Unique hybrids | **2,912** |
+| Predictions generated | **2,994,894** cross × location combinations |
+| Model | **XGBoost** (400 trees, lr=0.03) |
+| CV R² (honest, normalized) | **0.355** |
+| Test R² (normalized) | **0.361** |
 
 ---
 
 ## 📂 Dataset
 
-| Field | Details |
-|-------|---------|
-| **Source** | [G2F 2017 — CyVerse Data Commons](https://datacommons.cyverse.org/browse/iplant/home/shared/commons_repo/curated/GenomesToFields_2014_2017_v1/G2F_Planting_Season_2017_v1) |
+All data is from the public **G2F — Genomes to Fields** initiative.
+
+| Source | Details |
+|--------|---------|
+| **DOI** | [10.25739/ragt-7213](https://datacommons.cyverse.org/browse/iplant/home/shared/commons_repo/curated/GenomesToFields_2014_2017_v1) |
 | **License** | Public research dataset |
 
-**Local data files used by default:**
+**Files used:**
 
-| File | Notes |
-|------|-------|
-| `data/g2f_2017_hybrid_data_clean.csv` | Phenotype and plant trait data |
-| `data/g2f_2017_weather_data.csv` | Weather observations by location and date |
-| `data/g2f_2017_ZeaGBSv27_Imputed_AGPv4.h5` | Genotype SNP matrix *(optional — often excluded from repo)* |
+| File | Description | Size |
+|------|-------------|------|
+| `inbreds_G2F_2014-2023_437k.vcf` | Combined genotype VCF — 2,193 inbreds, 437,214 SNPs | 217 MB |
+| `g2f_20XX_hybrid_data_clean.csv` | Phenotype data per year (2014–2018) | ~2–5 MB each |
+| `g2f_20XX_weather_data.csv` | Daily weather per location (2014–2018) | 28–251 MB each |
+| `g2f_20XX_soil_data_clean.csv` | Soil properties per location (2015–2018) | <1 MB each |
 
-> If the genotype H5 file is missing, the pipeline automatically falls back to precomputed predictions.
+**Years used:** 2014, 2015, 2016, 2017, 2018 — the only years with both phenotype AND genotype data. 2019–2023 have phenotype but no SNP data and are excluded.
 
 ---
 
 ## 📊 Model Performance
 
-Each version builds incrementally on the previous, demonstrating the value of each added data source:
+### Evolution across versions
 
-| Version | Change | CV R² | Test R² |
-|---------|--------|:-----:|:-------:|
-| v1 | Raw SNPs only | neg | 0.146 |
-| v2 | + Environment | 0.111 | 0.487 |
-| v3 | + PCA compression | 0.169 | 0.490 |
-| v4 | + Weather data | 0.183 | 0.508 |
-| **v5** | **No averaging (best)** | **0.572** | **0.635** |
+Each version builds incrementally, demonstrating the value of each added data source:
 
-### ✅ Final Model — v5 (Random Forest)
+| Version | Key Change | CV R² | Test R² | Samples |
+|---------|-----------|:-----:|:-------:|:-------:|
+| v1 | Raw SNPs only | neg | 0.146 | 2,867 |
+| v2 | + Environment | 0.111 | 0.487 | 2,867 |
+| v3 | + PCA compression | 0.169 | 0.490 | 2,867 |
+| v4 | + Weather data | 0.183 | 0.508 | 2,867 |
+| v5 | Random Forest, 2017 only | 0.572 | 0.635 | 2,867 |
+| **v25** | **XGBoost, 5-year multi-location** | **0.355** | **0.361** | **46,686** |
 
-| Metric | Value |
-|--------|-------|
-| Test R² | **0.635** |
-| CV Mean R² | **0.572** |
-| Training Samples | 2,867 |
-| Error Metric | MAE (bu/A) |
+> **Why did CV R² drop from v5 to v25?** v5 was trained on 2017-only data (1 year, 23 locations). The v25 honest CV is harder: it trains on 5 years × 38 locations with proper per-fold location re-normalisation, making it a much more rigorous generalisation test. The v5 CV also had data leakage (y_norm computed on full dataset before CV splits). v25 is the honest number.
 
-> **Reproducibility note:** Results are from experiment v5 on the G2F 2017 dataset split. Full model-evaluation metrics are written to `outputs/predictions/metrics.json` (train mode) and `outputs/predictions/inference_metrics.json` (predict mode).
+### ✅ Current Model — v25 (XGBoost, 5-year G2F)
 
-> ⚠️ **`lightweight_metrics.json` is not a model-evaluation file.** It contains summary statistics derived from `all_predictions.csv`: row count, yield mean, std, min, and max only.
+| Metric | Value | Notes |
+|--------|-------|-------|
+| CV R² (normalized) | **0.355 ± 0.007** | Honest 3-fold; location z-scores re-computed per fold |
+| Test R² (normalized) | **0.361** | 20% held-out test set, never seen during training |
+| Training samples | **46,686** | 5 years × 38 locations × 2,912 hybrids |
+| Algorithm | **XGBoost** | 400 trees, lr=0.03, max_depth=5 |
+| SNP strategy | **Mid-parent average** | `(female_dosage + male_dosage) / 2` → 10k features |
+| PCA components | **20** | TruncatedSVD on scaled mid-parent SNP matrix |
+| Total features | **47** | 20 PCA + 27 env/trait features |
+
+> **Context:** Published GBLUP benchmarks on G2F data typically achieve R² = 0.35–0.55 on normalized yield. NeuroCrop is competitive while additionally modelling real field-level environment — something standard GBLUP does not do.
 
 ---
 
 ## 🔍 Feature Importance
 
-| Category | Importance | Notes |
-|----------|:----------:|-------|
-| Plant Trait | **43.1%** | Reflects field-expressed genetic potential |
-| Season Weather | **31.9%** | Growing-season climate aggregates |
-| Genetics (PCA) | **18.4%** | 10 principal components from 10,000 SNPs |
-| Critical Weather | **6.6%** | Flowering-period weather window |
+| Feature Group | Importance | Features Included |
+|---------------|:----------:|-------------------|
+| **Genetics (PCA)** | **41.1%** | 20 principal components from top-10k SNPs (mid-parent) |
+| **Plant Traits** | **23.7%** | Height, ear height, moisture, silk DAP, pollen DAP |
+| **Season Weather** | **18.9%** | Temp, humidity, rainfall, solar radiation, wind, photoperiod (May–Sep) |
+| **Critical Weather** | **16.3%** | Temp mean/max, rainfall, solar, humidity (Jun–Aug flowering window) |
+| **Soil** | **0.0%** | pH, OM, N, K, CEC, sand/silt/clay *(limited coverage — 1 of 38 locations matched)* |
 
-> **Plant traits dominate** because they integrate both genetic and environmental influences as expressed in the field.
+> **Note on soil:** Soil files exist for 2015–2018 but only 1 location had matching `Field-Location` keys in the current run. Improving soil coverage is the highest-priority data quality task.
 
 ---
 
 ## 🧠 Pipeline Overview
 
 ### 1️⃣ Data Preprocessing
-- Load phenotype CSV and match parent IDs
-- Load genotype H5 and extract SNPs — 5,000 per female + 5,000 per male (10,000 total)
-- Aggregate weather by growing season and critical flowering period
-- Encode field locations
 
-### 2️⃣ Feature Engineering
-- PCA compresses 10,000 SNPs → **10 principal components**
-- Combine genomic PCs with **17 environmental / plant trait features**
-- Final feature vector: **27 features**
+- Stack 5 years of phenotype CSVs → 84,045 rows → filter to 46,686 after genotype matching
+- Weather: load only 8 columns per year via `usecols` (2018 = 251 MB → 24 MB in RAM); parse `Month [Local]` column
+- Soil: concat years, deduplicate `Field-Location` columns, fill missing with column mean
+- Retry logic on all Drive reads (`OSError [Errno 107]` = Drive disconnect → auto-remount)
 
-### 3️⃣ Model Training
-- **Algorithm:** Random Forest Regressor
-- **Hyperparameters:** `n_estimators=200` | `max_depth=10` | `min_samples_leaf=5`
-- **Validation:** 5-fold cross-validation
+### 2️⃣ Genotype Loading (VCF, two-pass streaming)
 
-### 4️⃣ Prediction System
+```
+Pass 1: iter_vcf_chunks(chunk_length=50k) → per-SNP variance → TOP_SNP_IDX
+Pass 2: iter_vcf_chunks(chunk_length=50k) → extract only top-10k rows → dosage_top
+```
+
+- Never allocates full dosage matrix (3.6 GB) — peak RAM ≈ 500 MB
+- `dosage_top` shape: `(2,193 inbreds, 10,000 SNPs)` = 84 MB
+- SNP representation: **mid-parent average** `(female + male) / 2` → `(n_samples, 10,000)`
+
+### 3️⃣ Feature Engineering
+
+- `scaler_snp`: StandardScaler fitted via `partial_fit` chunks (in-place, no extra allocation)
+- `PCA_SNP_MEAN`: column mean subtracted in-place for TruncatedSVD compatibility
+- `TruncatedSVD(n_components=20)`: no hidden float64 copy — peak Cell 23 RAM ≈ 5.6 GB
+- Final feature matrix: `X_final (46,686 × 47)` = 8 MB
+
+### 4️⃣ Model Training
+
+- **Algorithm:** XGBoost (400 trees, lr=0.03, max_depth=5, subsample=0.8)
+- **Yield normalisation:** per-location z-score (`(y - loc_mean) / loc_std`)
+- **Validation:** honest 3-fold CV — location z-scores re-computed inside each fold to prevent leakage
+- **De-normalisation at inference:** `pred_bu_A = pred_norm × loc_std + loc_mean`
+
+### 5️⃣ Prediction System
 
 ```python
 predict_yield(parent1, parent2, location)
-# → Returns: Yield (bu/A) + Category (High / Medium / Low)
+# → Returns: (yield_bu_A, std_bu_A)
 ```
 
-**Fallback outputs** (used when H5 data or trained model artifacts are unavailable):
-- `outputs/predictions/all_predictions.csv`
-- `outputs/predictions/lightweight_metrics.json`
-- `outputs/predictions/top_crosses_by_location.csv`
+- Pre-cached SNP vectors (`SNP_CACHE`) and location env vectors (`LOC_ENV_CACHE`) for fast lookup
+- 2,994,894 combinations pre-computed and saved to `all_predictions.csv` (99.8 MB)
+- Streamlit app serves predictions via CSV lookup — no model inference at runtime
 
 ---
 
 ## 🌽 Example Predictions
 
-### Single-Cross Predictions
+### Single-Cross Predictions (v25 model)
 
-| Female | Male | Location | Yield (bu/A) | Category |
-|--------|------|----------|:------------:|:--------:|
-| B73 | Mo17 | ILH1 | 174.03 | 🟢 High |
-| B73 | Mo17 | GAH1 | 108.83 | 🔴 Low |
-| A632 | 3IIH6 | WIH1 | 178.64 | 🟢 High |
-| Oh43 | Mo17 | IAH4 | 196.05 | 🟢 High |
-| B97 | 3IIH6 | MNH1 | 151.04 | 🟡 Medium |
+| Female | Male | Location | Predicted (bu/A) | Category |
+|--------|------|----------|:----------------:|:--------:|
+| B73 | Mo17 | ILH1 | **180.27** | 🟢 High |
+| B73 | Mo17 | GAH1 | **134.40** | 🔴 Low |
+| Oh43 | Mo17 | IAH4 | **176.21** | 🟢 High |
 
 ### Top Locations for B73 × Mo17
 
-| Rank | Location | Yield (bu/A) |
-|:----:|----------|:------------:|
-| 1 | WIH2 | 218.88 |
-| 2 | WIH1 | 211.77 |
-| 3 | NYH3 | 203.59 |
-| 4 | ONH1 | 201.79 |
-| 5 | DEH1 | 201.62 |
+| Rank | Location | Predicted Yield (bu/A) |
+|:----:|----------|:----------------------:|
+| 1 | WIH1 | **194.04** |
+| 2 | ONH1 | **194.00** |
+| 3 | IAH2 | **185.12** |
+| 4 | NCH1 | **183.05** |
+| 5 | IAH4 | **182.98** |
 
 ---
 
 ## 📊 Visualizations
 
-All plots are saved to `outputs/plots/`:
+Generated by the notebook and available in the Streamlit app:
 
-| File | Description |
-|------|-------------|
-| `actual_vs_predicted.png` | Predicted vs observed yield scatter |
-| `feature_importance.png` | Importance grouped by category |
-| `pca_variance.png` | Scree plot for genomic PCs |
-| `residual_plot.png` | Residual distribution and patterns |
-| `yield_distribution.png` | Yield histogram and by-location boxplots |
-| `yield_vs_plant_height.png` | Trait correlation with yield |
-| G×E Heatmap | Genotype × Environment yield interaction heatmap |
-| Cross-Validation Scores | Fold-by-fold R² distribution |
+| Output | Description |
+|--------|-------------|
+| Actual vs Predicted scatter | Test set R² = 0.361, normalized yield |
+| Feature importance bar chart | Grouped by category (genetics, traits, weather, soil) |
+| PCA variance explained | TruncatedSVD scree plot |
+| Residual plot | Bias and variance pattern by predicted value |
+| Yield distribution | Histogram + by-location boxplot |
+| G×E interaction lines | Hybrid performance across locations |
+| G×E heatmap | Genotype × environment yield matrix |
+| CV fold scores | Honest 3-fold R² per fold |
+| Stability scatter | Mean yield vs CV% for all 2,912 hybrids |
 
 ---
 
 ## ⚙️ Requirements
 
-| Library | Version |
-|---------|---------|
-| Python | 3.8+ |
-| NumPy | ≥ 1.24.0 |
-| Pandas | ≥ 2.0.0 |
-| Scikit-learn | ≥ 1.3.0 |
-| h5py | ≥ 3.9.0 |
-| Matplotlib | latest |
-| Plotly | latest |
-| Streamlit | ≥ 1.28.0 |
-| Joblib | latest |
-
-> **Note:** Verify that `requirements.txt` is in standard pip format (one package per line) before running `pip install -r requirements.txt`. If it contains markdown-style content, install packages manually from the table above or convert the file first.
+| Library | Version | Purpose |
+|---------|---------|---------|
+| Python | 3.9+ | |
+| numpy | ≥ 1.24 | Array operations |
+| pandas | ≥ 2.0 | Data loading |
+| scikit-learn | ≥ 1.3 | Scaler, PCA, CV |
+| xgboost | ≥ 1.7 | Primary model |
+| scikit-allel | 1.3.13 | VCF loading (`iter_vcf_chunks`) |
+| plotly | latest | Interactive charts |
+| streamlit | ≥ 1.28 | Web app |
+| reportlab | latest | PDF report generation |
+| openpyxl | latest | Excel export |
 
 ---
 
 ## 🚀 Installation
 
-> Designed for **local Python** execution.
-
 ```bash
-# Clone the repository
 git clone https://github.com/manan348/maize-yield-prediction.git
 cd maize-yield-prediction
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
 ---
 
-## 🖥️ Running Modes
+## 🖥️ Running the App
 
-### 1) Train mode
-
-```bash
-python main.py --mode train
-```
-
-What it does:
-- Loads `data/g2f_2017_hybrid_data_clean.csv` and `data/g2f_2017_weather_data.csv`
-- Loads genotype H5 file if present at `data/g2f_2017_ZeaGBSv27_Imputed_AGPv4.h5`
-- Builds 27-feature matrix (10 SNP PCA components + 17 environmental/trait features)
-- Trains Random Forest with 5-fold cross-validation
-- Saves model artifacts and evaluation metrics to `outputs/predictions/`
-
-### 2) Predict mode
-
-```bash
-python main.py --mode predict
-```
-
-Behavior:
-- If `model.joblib`, `X_final.npy`, and `y.npy` exist in `outputs/predictions/` → runs inference and writes:
-  - `outputs/predictions/inference_predictions.csv`
-  - `outputs/predictions/inference_metrics.json`
-- Otherwise → switches to **lightweight fallback** and writes summary artifacts from `all_predictions.csv`
-
-### 3) Streamlit app
+### Streamlit (local)
 
 ```bash
 streamlit run app/app.py
 ```
 
-> The app is a **lookup and inference UI** over precomputed predictions. It does **not** run model training. It expects `outputs/predictions/all_predictions.csv` to be present.
+The app expects `outputs/predictions/all_predictions.csv` to be present. It serves pre-computed predictions — no model inference at runtime.
+
+### Live deployment
+
+The app is deployed on Streamlit Cloud:  
+🌐 [maize-yield-prediction-ryntvaanvvfya8wkdtkkba.streamlit.app](https://maize-yield-prediction-ryntvaanvvfya8wkdtkkba.streamlit.app/)
+
+### Retraining (Google Colab)
+
+Open `notebook/maize_yield_prediction_v25_fixed.ipynb` in Colab with Drive mounted. Run cells in order:
+
+```
+9 (paths) → 10 (pip install) → 11 (phenotype + VCF names) →
+13 (lookups) → 14 (prep phenotype) → 16 (weather + soil) →
+18 (merge) → 20 (imports) → 21 (~5 min, VCF load) →
+23 (~6 min, PCA) → 25 (~8 min, train) → 28 (save) →
+36 (cache + predict_yield) → 37 (~20 min, all_predictions.csv)
+```
+
+**After a crash:** Run Cell 33 (loads all saved `.npy`/`.pkl` from Drive) → jump to Cell 36 → Cell 37.
 
 ---
 
-## 📦 Artifacts Produced
+## 📦 Artifacts
 
 ### `outputs/predictions/`
 
-| File | Generated By | Description |
-|------|:------------:|-------------|
-| `all_predictions.csv` | Precomputed / fallback | All cross × location yield predictions |
-| `lightweight_metrics.json` | Fallback mode | Summary stats only: rows, yield mean/std/min/max |
-| `top_crosses_by_location.csv` | Fallback mode | Ranked top crosses per location |
-| `metrics.json` | Train mode | CV R², Test R², MAE ← model evaluation |
-| `test_predictions.csv` | Train mode | Held-out test set predictions |
-| `model.joblib` | Train mode | Serialized Random Forest model |
-| `best_model.pkl` | Train mode | Best model checkpoint |
-| `pca.pkl` | Train mode | Fitted PCA transformer |
-| `scaler_snp.pkl` | Train mode | SNP feature scaler |
-| `scaler_final.pkl` | Train mode | Final feature scaler |
-| `X_snp.npy` | Train mode | SNP feature array |
-| `X_env.npy` | Train mode | Environmental feature array |
-| `X_final.npy` | Train mode | Combined feature matrix |
-| `y.npy` | Train mode | Target yield array |
-| `df_raw.csv` | Train mode | Processed raw dataframe |
-| `inference_predictions.csv` | Predict mode | Inference output on full dataset |
-| `inference_metrics.json` | Predict mode | Evaluation metrics from inference run ← model evaluation |
-
-### `outputs/plots/`
-
-Generated during training: `actual_vs_predicted.png`, `feature_importance.png`, `pca_variance.png`, `residual_plot.png`, `yield_distribution.png`, `yield_vs_plant_height.png`, and related outputs.
+| File | Size | Description |
+|------|------|-------------|
+| `all_predictions.csv` | **99.8 MB** | 2,994,894 cross × location predictions |
+| `loc_stats.csv` | <1 MB | Per-location yield mean + std for de-normalisation |
+| `df_raw.csv` | 12.4 MB | Processed phenotype dataframe (46,686 rows) |
+| `feat_cols.json` | <1 MB | FEAT_COLS, SOIL_COLS, N_SNPS, N_COMP |
+| `taxa_lookup.json` | <1 MB | Inbred name → VCF row index mapping |
+| `best_model.pkl` | 1.0 MB | Fitted XGBoost model |
+| `pca.pkl` | 0.8 MB | TruncatedSVD (20 components) |
+| `scaler_snp.pkl` | 0.2 MB | StandardScaler for 10k mid-parent SNP features |
+| `scaler_final.pkl` | <1 MB | StandardScaler for 47-feature final matrix |
+| `dosage_top.npy` | 83.7 MB | Top-10k SNP dosage matrix (2,193 × 10,000) |
+| `pca_snp_mean.npy` | <1 MB | Column mean for pre-centering before TruncatedSVD |
+| `TOP_SNP_IDX.npy` | 0.1 MB | Global VCF positions of top-10k SNPs |
+| `kept_df_indices.npy` | 0.4 MB | df row indices used for training alignment |
+| `X_snp.npy` | — | Mid-parent SNP matrix (46,686 × 10,000) |
+| `X_env.npy` | 0.3 MB | Environment feature matrix |
+| `X_final.npy` | 0.5 MB | Final feature matrix (46,686 × 47) |
+| `y.npy` / `y_norm.npy` | 0.2 MB | Raw and normalised yield targets |
 
 ---
 
@@ -297,40 +302,54 @@ Generated during training: `actual_vs_predicted.png`, `feature_importance.png`, 
 
 ```
 maize-yield-prediction/
-├── main.py                          # Primary CLI entrypoint (--mode train / predict)
 ├── app/
-│   └── app.py                       # Streamlit lookup & inference UI
-├── src/
-│   ├── data/
-│   │   ├── load_data.py             # H5 and CSV data loading
-│   │   └── preprocess.py            # Phenotype cleaning, SNP extraction, weather aggregation
-│   ├── features/
-│   │   └── build_features.py        # PCA compression, feature assembly (27 features)
-│   ├── models/
-│   │   ├── train.py                 # Random Forest training + cross-validation
-│   │   └── predict.py               # Inference logic + fallback handler
-│   └── visualization/
-│       └── plots.py                 # All plot generation
-├── data/
-│   ├── g2f_2017_hybrid_data_clean.csv
-│   ├── g2f_2017_weather_data.csv
-│   └── g2f_2017_ZeaGBSv27_Imputed_AGPv4.h5  # Optional — often excluded from repo
+│   └── app.py                        # Streamlit UI (NeuroCrop — 6 tabs)
+├── notebook/
+│   └── maize_yield_prediction_v25_fixed.ipynb   # Colab training notebook
 ├── outputs/
-│   ├── predictions/                 # All model outputs, metrics, and fallback CSVs
-│   └── plots/                       # Generated visualizations
-├── notebook/                        # Exploratory notebooks
+│   ├── predictions/
+│   │   ├── all_predictions.csv       # 2,994,894 pre-computed predictions (99.8 MB)
+│   │   ├── loc_stats.csv
+│   │   ├── df_raw.csv
+│   │   ├── feat_cols.json
+│   │   ├── taxa_lookup.json
+│   │   ├── best_model.pkl
+│   │   ├── pca.pkl
+│   │   ├── scaler_snp.pkl
+│   │   ├── scaler_final.pkl
+│   │   ├── dosage_top.npy
+│   │   ├── pca_snp_mean.npy
+│   │   └── *.npy
+│   └── plots/
+│       ├── actual_vs_predicted.png
+│       ├── feature_importance.png
+│       ├── pca_variance.png
+│       └── residual_plot.png
 ├── requirements.txt
-├── README.md
+└── README.md
 ```
+
+---
+
+## 🗺️ Roadmap
+
+| Timeline | Goal |
+|----------|------|
+| **Now** | Validate predictions against held-out G2F trial data; screenshot for investor deck |
+| **+2 weeks** | FastAPI endpoint: `POST /predict {female, male, location}` → yield + std + percentile |
+| **+1 month** | Add soybean (same G2F pipeline, broader TAM) |
+| **+1 month** | Talk to 10 seed companies / plant breeders before building further |
+| **+3 months** | Breeding recommendation engine: "Given my gene pool, recommend top 20 untested crosses" |
+| **Fundraising** | 1 paying API customer + 2–3 letters of intent + working multi-year demo |
 
 ---
 
 ## 📄 License
 
-**Dataset:** The G2F 2017 dataset is a public research dataset from CyVerse Data Commons. Please cite the original data source in any publications using this work.
+**Dataset:** The G2F dataset is a public research resource from CyVerse Data Commons. Please cite the original source (DOI: 10.25739/ragt-7213) in any publications.
 
-**Code:** Released under the **MIT License** — applies if a `LICENSE` file is included and set accordingly. See `LICENSE` for details.
+**Code:** MIT License — see `LICENSE` for details.
 
 ---
 
-*Built  for plant breeders navigating the complexity of G×E interactions.*
+*NeuroCrop — predicting the field before planting it.*
