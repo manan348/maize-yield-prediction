@@ -317,7 +317,11 @@ with tab1:
             gauge={"axis":{"range":[OV["min"],OV["max"]]},"bar":{"color":"#16a34a"},
                    "steps":[{"range":[OV["min"],150],"color":"#fde8e8"},{"range":[150,170],"color":"#fef9c3"},{"range":[170,OV["max"]],"color":"#dcfce7"}],
                    "threshold":{"line":{"color":"#14532d","width":3},"thickness":0.8,"value":OV["mean"]}}))
-        fig.update_layout(height=330, margin=dict(t=40,b=10))
+        fig.update_layout(
+            height=330, margin=dict(t=40,b=10),
+            paper_bgcolor="#0d1f13", plot_bgcolor="#0d1f13",
+            font=dict(color="#e2f5e9", size=13)
+        )
         st.plotly_chart(fig, use_container_width=True)
         st.markdown('<div class="info-pill"><strong>Feature contribution:</strong> Genetics 41% · Plant traits 24% · Season weather 19% · Critical-period weather 16%</div>', unsafe_allow_html=True)
         st.markdown("---")
@@ -342,9 +346,19 @@ with tab2:
         b = res.iloc[0]
         st.success(f"🏆 Best: **{b['Location']}** → {b['Yield']} bu/A  (Top {100-b['Percentile']:.0f}%)")
         fig = px.bar(res, x="Location", y="Yield", color="Yield", color_continuous_scale="RdYlGn",
-                     title=f"{female} x {male} — Yield by Location", text="Yield", template="plotly_white")
-        fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-        fig.update_layout(xaxis_tickangle=-45, height=450, showlegend=False, plot_bgcolor="#f8fdf9")
+                     title=f"{female} x {male} — Yield by Location", text="Yield", template="plotly_dark")
+        fig.update_traces(texttemplate="%{text:.1f}", textposition="outside",
+                          textfont=dict(size=11, color="#e2f5e9"))
+        fig.update_layout(
+            xaxis_tickangle=-45, height=520, showlegend=False,
+            plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13",
+            font=dict(color="#e2f5e9", size=12),
+            title=dict(font=dict(size=16, color="#a7f3c0")),
+            xaxis=dict(tickfont=dict(size=11, color="#e2f5e9"), gridcolor="#1e3a28"),
+            yaxis=dict(tickfont=dict(size=12, color="#e2f5e9"), gridcolor="#1e3a28",
+                       title="Yield (bu/A)", title_font=dict(color="#86efac")),
+            margin=dict(t=60, b=100)
+        )
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(res, use_container_width=True)
         st.download_button("📥 Download CSV", res.to_csv(index=False), f"best_locs_{female}_{male}.csv")
@@ -359,9 +373,9 @@ with tab3:
     cross_df.index += 1
     fig = px.bar(cross_df, x="Yield", y="Cross", orientation="h", color="Yield",
                  color_continuous_scale="RdYlGn", title=f"Top {top_n} Crosses at {location}",
-                 text="Yield", template="plotly_white")
+                 text="Yield", template="plotly_dark")
     fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-    fig.update_layout(height=max(400,top_n*25), showlegend=False, yaxis={"categoryorder":"total ascending"}, plot_bgcolor="#f8fdf9")
+    fig.update_layout(height=max(400,top_n*25), showlegend=False, yaxis={"categoryorder":"total ascending"}, plot_bgcolor="#0d1f13")
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(cross_df[["Cross","Yield"]], use_container_width=True)
     st.download_button("📥 Download CSV", cross_df.to_csv(index=False), f"top_crosses_{location}.csv")
@@ -398,9 +412,9 @@ with tab4:
         comp_df = pd.DataFrame(comp_rows)
         comp_df["Label"] = comp_df["Hybrid"]+"\n@"+comp_df["Location"]
         fig = px.bar(comp_df, x="Label", y="Yield", color="Yield", color_continuous_scale="RdYlGn",
-                     text="Yield", title="Yield Comparison", template="plotly_white")
+                     text="Yield", title="Yield Comparison", template="plotly_dark")
         fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-        fig.update_layout(height=360, showlegend=False, plot_bgcolor="#f8fdf9", xaxis_title="", yaxis_title="Predicted Yield (bu/A)")
+        fig.update_layout(height=360, showlegend=False, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13), xaxis_title="", yaxis_title="Predicted Yield (bu/A)")
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("**Performance across ALL locations:**")
         prof = []
@@ -411,8 +425,8 @@ with tab4:
         if prof:
             prof_df = pd.DataFrame(prof)
             fig2 = px.line(prof_df, x="Location", y="Yield", color="Hybrid", markers=True,
-                           title="Yield Profile Across All Locations", template="plotly_white")
-            fig2.update_layout(height=400, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9")
+                           title="Yield Profile Across All Locations", template="plotly_dark")
+            fig2.update_layout(height=400, xaxis_tickangle=-45, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13))
             st.plotly_chart(fig2, use_container_width=True)
         stab = stability_df()
         summ = []
@@ -435,14 +449,19 @@ with tab5:
         ge = df[df["Female"].isin(sel_f)&(df["Male"]==fix_m)].copy()
         ge["Hybrid"] = ge["Female"]+" x "+ge["Male"]
         if len(ge):
-            fig = px.line(ge, x="Location", y="Yield", color="Hybrid", markers=True, title="G×E Interaction", template="plotly_white")
+            fig = px.line(ge, x="Location", y="Yield", color="Hybrid", markers=True, title="G×E Interaction", template="plotly_dark")
             fig.add_hline(y=ge["Yield"].mean(), line_dash="dash", line_color="#14532d", annotation_text=f"Grand Mean ({ge['Yield'].mean():.1f} bu/A)")
-            fig.update_layout(height=480, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9")
+            fig.update_layout(height=480, xaxis_tickangle=-45, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13))
             st.plotly_chart(fig, use_container_width=True)
             pivot = ge.pivot_table(index="Hybrid", columns="Location", values="Yield", aggfunc="mean")
             if not pivot.empty:
-                fig2 = px.imshow(pivot, color_continuous_scale="RdYlGn", title="G×E Heatmap (bu/A)", text_auto=".0f", template="plotly_white")
-                fig2.update_layout(height=max(280, len(sel_f)*65+120))
+                fig2 = px.imshow(pivot, color_continuous_scale="RdYlGn", title="G×E Heatmap (bu/A)", text_auto=".0f", template="plotly_dark")
+                fig2.update_layout(
+                    height=max(320, len(sel_f)*80+140),
+                    paper_bgcolor="#0d1f13", plot_bgcolor="#0d1f13",
+                    font=dict(color="#e2f5e9", size=13),
+                    title=dict(font=dict(size=15, color="#a7f3c0"))
+                )
                 st.plotly_chart(fig2, use_container_width=True)
         else:
             st.info("No data for the selected combination.")
@@ -462,8 +481,8 @@ with tab6:
                          hover_data=["Hybrid","N_Locs"],
                          color_discrete_map={"🟢 Stable":"#16a34a","🟡 Moderate":"#ca8a04","🔴 Unstable":"#dc2626"},
                          title="Yield vs Stability", labels={"CV_pct":"CV% (lower = more stable)","Mean_Yield":"Mean Yield (bu/A)"},
-                         template="plotly_white")
-        fig.update_layout(height=440, plot_bgcolor="#f8fdf9")
+                         template="plotly_dark")
+        fig.update_layout(height=440, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13))
         st.plotly_chart(fig, use_container_width=True)
         show = ["Hybrid","Mean_Yield","Std_Yield","CV_pct","N_Locs","Stability"]
         st.dataframe(filt[show].reset_index(drop=True), use_container_width=True)
@@ -480,11 +499,11 @@ with tab7:
     with et1:
         fig = px.histogram(df, x="Yield", nbins=60,
                            title=f"Global Yield Distribution ({OV['n']:,} predictions)",
-                           color_discrete_sequence=["#16a34a"], template="plotly_white")
+                           color_discrete_sequence=["#16a34a"], template="plotly_dark")
         fig.add_vline(x=OV["mean"], line_dash="dash", line_color="#14532d", annotation_text=f"Mean: {OV['mean']:.1f}")
         fig.add_vline(x=150, line_dash="dot", line_color="orange",  annotation_text="Medium threshold")
         fig.add_vline(x=170, line_dash="dot", line_color="#16a34a", annotation_text="High threshold")
-        fig.update_layout(height=380, plot_bgcolor="#f8fdf9")
+        fig.update_layout(height=380, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13))
         st.plotly_chart(fig, use_container_width=True)
         c1,c2,c3,c4 = st.columns(4)
         c1.metric("Mean",  f"{OV['mean']:.1f} bu/A")
@@ -493,15 +512,20 @@ with tab7:
         c4.metric("Max",   f"{OV['max']:.1f} bu/A")
         ph = (df["Yield"]>=170).mean()*100; pm = ((df["Yield"]>=150)&(df["Yield"]<170)).mean()*100; pl = (df["Yield"]<150).mean()*100
         fig2 = px.pie(values=[ph,pm,pl], names=["High (>=170)","Medium (150-170)","Low (<150)"],
-                      color_discrete_sequence=["#16a34a","#ca8a04","#dc2626"], title="Category Distribution", hole=0.45, template="plotly_white")
-        fig2.update_layout(height=300)
+                      color_discrete_sequence=["#16a34a","#ca8a04","#dc2626"], title="Category Distribution", hole=0.45, template="plotly_dark")
+        fig2.update_layout(
+            height=320, paper_bgcolor="#0d1f13",
+            font=dict(color="#e2f5e9", size=13),
+            title=dict(font=dict(size=15, color="#a7f3c0")),
+            legend=dict(font=dict(size=12, color="#e2f5e9"))
+        )
         st.plotly_chart(fig2, use_container_width=True)
 
     with et2:
         ls = df.groupby("Location")["Yield"].agg(Mean="mean", Std="std", N="count").reset_index().sort_values("Mean", ascending=False)
         fig = px.bar(ls, x="Location", y="Mean", error_y="Std", color="Mean", color_continuous_scale="RdYlGn",
-                     title="Mean Predicted Yield by Location (+/-1 std)", template="plotly_white")
-        fig.update_layout(height=460, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9", showlegend=False)
+                     title="Mean Predicted Yield by Location (+/-1 std)", template="plotly_dark")
+        fig.update_layout(height=460, xaxis_tickangle=-45, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13), showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(ls.reset_index(drop=True), use_container_width=True)
         st.download_button("📥 Location Stats CSV", ls.to_csv(index=False), "location_stats.csv")
@@ -511,15 +535,15 @@ with tab7:
         fs = df.groupby("Female")["Yield"].mean().sort_values(ascending=False).head(20).reset_index()
         fs.columns = ["Female","Mean Yield"]
         fig = px.bar(fs, x="Female", y="Mean Yield", color="Mean Yield", color_continuous_scale="Greens",
-                     title="Top 20 Female Parents", template="plotly_white")
-        fig.update_layout(height=360, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9", showlegend=False)
+                     title="Top 20 Female Parents", template="plotly_dark")
+        fig.update_layout(height=360, xaxis_tickangle=-45, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13), showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("**Top 20 Male Parents by Mean Yield**")
         ms = df.groupby("Male")["Yield"].mean().sort_values(ascending=False).head(20).reset_index()
         ms.columns = ["Male","Mean Yield"]
         fig2 = px.bar(ms, x="Male", y="Mean Yield", color="Mean Yield", color_continuous_scale="Blues",
-                      title="Top 20 Male Parents", template="plotly_white")
-        fig2.update_layout(height=360, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9", showlegend=False)
+                      title="Top 20 Male Parents", template="plotly_dark")
+        fig2.update_layout(height=360, xaxis_tickangle=-45, plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13), showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
 
 # TAB 8 — Batch Predict ───────────────────────────────────────
@@ -559,7 +583,8 @@ with tab8:
                 m3.metric("Worst",   f"{res['Predicted Yield'].min():.1f} bu/A")
                 st.dataframe(res, use_container_width=True)
                 fig = px.histogram(res, x="Predicted Yield", nbins=20, title="Batch Distribution",
-                                   color_discrete_sequence=["#16a34a"], template="plotly_white")
+                                   color_discrete_sequence=["#16a34a"], template="plotly_dark")
+                fig.update_layout(paper_bgcolor="#0d1f13", plot_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13))
                 st.plotly_chart(fig, use_container_width=True)
                 c1,c2 = st.columns(2)
                 c1.download_button("📥 CSV", res.to_csv(index=False), "batch.csv", "text/csv", use_container_width=True)
@@ -580,19 +605,63 @@ with tab9:
 
     with cl:
         st.markdown("#### Feature Importance")
-        fi_df = pd.DataFrame({"Feature":["Genetics (SNP PCA)","Plant Traits","Season Weather","Critical-Period Weather","Soil"],"Importance %":[41.1,23.7,18.9,16.3,0.0]})
-        fig = px.bar(fi_df, x="Importance %", y="Feature", orientation="h", color="Importance %",
-                     color_continuous_scale="Greens", template="plotly_white", title="XGBoost Feature Importance")
-        fig.update_layout(height=280, showlegend=False, plot_bgcolor="#f8fdf9", yaxis={"categoryorder":"total ascending"})
+        fi_df = pd.DataFrame({
+            "Feature": ["Genetics (SNP PCA)", "Plant Traits", "Season Weather", "Critical-Period Weather", "Soil"],
+            "Importance %": [41.1, 23.7, 18.9, 16.3, 0.0]
+        })
+        fig = px.bar(
+            fi_df, x="Importance %", y="Feature", orientation="h",
+            color="Importance %", color_continuous_scale="Greens",
+            template="plotly_dark", title="XGBoost Feature Importance",
+            text="Importance %"
+        )
+        fig.update_traces(
+            texttemplate="%{text:.1f}%", textposition="outside",
+            textfont=dict(size=14, color="#e2f5e9"),
+            marker_line_color="#4ade80", marker_line_width=1.2
+        )
+        fig.update_layout(
+            height=380,
+            showlegend=False,
+            plot_bgcolor="#0d1f13",
+            paper_bgcolor="#0d1f13",
+            font=dict(color="#e2f5e9", size=13),
+            title=dict(font=dict(size=16, color="#a7f3c0")),
+            xaxis=dict(
+                title="Importance %", title_font=dict(size=13, color="#86efac"),
+                tickfont=dict(size=12, color="#e2f5e9"),
+                range=[0, 52], gridcolor="#1e3a28", showgrid=True
+            ),
+            yaxis=dict(
+                categoryorder="total ascending",
+                tickfont=dict(size=13, color="#e2f5e9"),
+                title=""
+            ),
+            margin=dict(l=180, r=60, t=50, b=30),
+            coloraxis_showscale=False
+        )
         st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("#### 2017 vs 5-Year Model")
         perf = pd.DataFrame({"Version":["2017 (RF)","2014-2018 (XGBoost)"],"CV R2":[0.572,0.355],"Test R2":[0.635,0.361]})
         fig2 = go.Figure()
-        fig2.add_trace(go.Bar(name="CV R2",   x=perf["Version"], y=perf["CV R2"],   marker_color="#16a34a"))
-        fig2.add_trace(go.Bar(name="Test R2", x=perf["Version"], y=perf["Test R2"], marker_color="#4ade80"))
-        fig2.update_layout(barmode="group", template="plotly_white", height=280, plot_bgcolor="#f8fdf9",
-                           yaxis_title="R2", yaxis_range=[0,0.75], title="Model Performance Comparison")
+        fig2.add_trace(go.Bar(name="CV R2",   x=perf["Version"], y=perf["CV R2"],   marker_color="#16a34a",
+                              text=[f"{v:.3f}" for v in perf["CV R2"]], textposition="outside",
+                              textfont=dict(size=13, color="#e2f5e9")))
+        fig2.add_trace(go.Bar(name="Test R2", x=perf["Version"], y=perf["Test R2"], marker_color="#4ade80",
+                              text=[f"{v:.3f}" for v in perf["Test R2"]], textposition="outside",
+                              textfont=dict(size=13, color="#e2f5e9")))
+        fig2.update_layout(
+            barmode="group", template="plotly_dark", height=340,
+            plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13",
+            font=dict(color="#e2f5e9", size=13),
+            title=dict(text="Model Performance Comparison", font=dict(size=16, color="#a7f3c0")),
+            yaxis=dict(title="R²", title_font=dict(size=13, color="#86efac"),
+                       tickfont=dict(size=12, color="#e2f5e9"), range=[0, 0.8], gridcolor="#1e3a28"),
+            xaxis=dict(tickfont=dict(size=13, color="#e2f5e9")),
+            legend=dict(font=dict(size=12, color="#e2f5e9"), bgcolor="#0d1f13", bordercolor="#1e3a28"),
+            margin=dict(t=50, b=20)
+        )
         st.plotly_chart(fig2, use_container_width=True)
 
     with cr:
