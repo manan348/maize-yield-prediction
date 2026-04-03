@@ -40,87 +40,118 @@ st.markdown("""
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@300;600;800&family=Instrument+Sans:wght@300;400;500;600&display=swap');
   html, body, [class*="css"] { font-family: 'Instrument Sans', sans-serif; }
   h1, h2, h3 { font-family: 'Fraunces', serif; }
+
+  /* ── Hero banner ── */
   .hero {
     background: linear-gradient(135deg, #071a0e 0%, #0d3320 40%, #14532d 75%, #166534 100%);
-    border-radius: 20px; padding: 40px 48px 36px; margin-bottom: 28px; position: relative; overflow: hidden;
+    border-radius: 20px; padding: 40px 48px 36px; margin-bottom: 28px;
+    position: relative; overflow: hidden;
   }
   .hero::before {
     content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 45%;
-    background: radial-gradient(ellipse at 80% 50%, rgba(74,222,128,0.08) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 80% 50%, rgba(74,222,128,0.12) 0%, transparent 70%);
   }
-  .hero h1 { color: #f0fdf4; font-size: 2.6rem; margin: 0 0 6px 0; font-weight: 800; letter-spacing: -0.02em; }
-  .hero .sub { color: #86efac; font-size: 0.95rem; font-weight: 300; letter-spacing: 0.04em; }
+  .hero h1  { color: #f0fdf4; font-size: 2.6rem; margin: 0 0 6px 0; font-weight: 800; letter-spacing: -0.02em; }
+  .hero .sub { color: #a7f3c0; font-size: 0.95rem; font-weight: 400; letter-spacing: 0.04em; }
   .hero .tag {
-    display: inline-block; background: rgba(74,222,128,0.15); border: 1px solid rgba(74,222,128,0.3);
-    color: #4ade80; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em;
-    padding: 3px 10px; border-radius: 20px; margin-right: 6px; margin-top: 12px; text-transform: uppercase;
-    cursor: default; transition: all 0.25s ease;
+    display: inline-block;
+    background: rgba(74,222,128,0.18); border: 1px solid rgba(74,222,128,0.45);
+    color: #6ee7a0; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+    padding: 4px 12px; border-radius: 20px; margin-right: 6px; margin-top: 12px;
+    text-transform: uppercase; cursor: default; transition: all 0.25s ease;
   }
   .hero .tag:hover {
-    background: rgba(74,222,128,0.28); border-color: rgba(74,222,128,0.6);
-    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(74,222,128,0.2);
+    background: rgba(74,222,128,0.32); border-color: #4ade80;
+    transform: translateY(-2px); box-shadow: 0 4px 14px rgba(74,222,128,0.25);
+    color: #bbf7d0;
   }
+
+  /* ── KPI cards ── */
   .kpi {
-    background: transparent;
-    border: 1px solid rgba(20,83,45,0.18);
+    background: #f0fdf4;
+    border: 1.5px solid #bbf7d0;
     border-radius: 14px; padding: 18px 16px; text-align: center;
     transition: all 0.25s ease; cursor: default;
-    backdrop-filter: blur(4px);
   }
   .kpi:hover {
-    border-color: rgba(34,197,94,0.5);
-    box-shadow: 0 4px 20px rgba(34,197,94,0.12);
+    background: #dcfce7;
+    border-color: #22c55e;
+    box-shadow: 0 6px 22px rgba(34,197,94,0.18);
     transform: translateY(-3px);
   }
-  .kpi .v { font-size: 1.9rem; font-weight: 600; color: #14532d; font-family: 'Fraunces', serif; }
-  .kpi .l { font-size: 0.72rem; color: #4b7a5e; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
+  .kpi .v { font-size: 1.9rem; font-weight: 700; color: #14532d; font-family: 'Fraunces', serif; }
+  .kpi .l { font-size: 0.72rem; color: #166534; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 4px; font-weight: 500; }
+
+  /* ── Info / Warn pills ── */
   .info-pill {
-    background: transparent;
-    border-left: 3px solid #22c55e;
-    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0;
-    font-size: 0.89rem; color: #14532d; line-height: 1.6;
-    transition: border-color 0.2s, padding-left 0.2s;
+    background: #f0fdf4;
+    border-left: 4px solid #22c55e;
+    border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 10px 0;
+    font-size: 0.89rem; color: #14532d; line-height: 1.7; font-weight: 400;
+    transition: border-left-width 0.2s, padding-left 0.2s, background 0.2s;
   }
-  .info-pill:hover { border-left-width: 5px; padding-left: 18px; }
+  .info-pill:hover { border-left-width: 6px; padding-left: 22px; background: #dcfce7; }
+
   .warn-pill {
-    background: transparent;
-    border-left: 3px solid #f59e0b;
-    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0;
-    font-size: 0.89rem; color: #78350f;
-    transition: border-color 0.2s, padding-left 0.2s;
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 10px 0;
+    font-size: 0.89rem; color: #78350f; line-height: 1.7; font-weight: 400;
+    transition: border-left-width 0.2s, padding-left 0.2s, background 0.2s;
   }
-  .warn-pill:hover { border-left-width: 5px; padding-left: 18px; }
+  .warn-pill:hover { border-left-width: 6px; padding-left: 22px; background: #fef3c7; }
+
+  /* ── Compare cards ── */
   .compare-card {
-    background: transparent;
-    border: 1px solid rgba(229,243,235,0.6);
+    background: #f8fdf9;
+    border: 1.5px solid #d1fae5;
     border-radius: 14px; padding: 20px; text-align: center;
     transition: all 0.25s ease;
-    backdrop-filter: blur(4px);
   }
   .compare-card:hover {
-    border-color: rgba(34,197,94,0.4);
-    box-shadow: 0 6px 24px rgba(34,197,94,0.1);
+    background: #ecfdf5;
+    border-color: #22c55e;
+    box-shadow: 0 6px 24px rgba(34,197,94,0.15);
     transform: translateY(-3px);
   }
-  .compare-card .hn  { font-family: 'Fraunces', serif; font-size: 1.1rem; color: #14532d; font-weight: 600; }
-  .compare-card .yb  { font-size: 2.4rem; font-weight: 700; font-family: 'Fraunces', serif; }
-  .compare-card .yu  { font-size: 0.85rem; color: #6b7280; }
+  .compare-card .hn { font-family: 'Fraunces', serif; font-size: 1.1rem; color: #14532d; font-weight: 700; }
+  .compare-card .yb { font-size: 2.4rem; font-weight: 700; font-family: 'Fraunces', serif; color: #166534; }
+  .compare-card .yu { font-size: 0.85rem; color: #4b7a5e; font-weight: 500; }
+
+  /* ── About sections ── */
   .about-section {
-    background: transparent;
-    border: 1px solid rgba(20,83,45,0.12);
+    background: #f8fdf9;
+    border: 1.5px solid #d1fae5;
     border-radius: 14px; padding: 24px 28px; margin: 12px 0;
     transition: all 0.25s ease;
-    backdrop-filter: blur(4px);
   }
   .about-section:hover {
-    border-color: rgba(34,197,94,0.35);
-    box-shadow: 0 4px 18px rgba(34,197,94,0.08);
+    background: #ecfdf5;
+    border-color: #22c55e;
+    box-shadow: 0 4px 18px rgba(34,197,94,0.12);
   }
-  .about-section h4 { font-family: 'Fraunces', serif; color: #14532d; margin-bottom: 8px; }
-  .stTabs [data-baseweb="tab-list"] { gap: 4px; background: transparent; border-radius: 10px; padding: 4px; border: 1px solid rgba(20,83,45,0.1); }
-  .stTabs [data-baseweb="tab"] { border-radius: 8px; padding: 7px 16px; font-weight: 500; font-size: 0.85rem; transition: all 0.2s; }
-  .stTabs [data-baseweb="tab"]:hover { background: rgba(74,222,128,0.08) !important; }
-  .stTabs [aria-selected="true"] { background: rgba(74,222,128,0.15) !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .about-section h4 { font-family: 'Fraunces', serif; color: #14532d; margin-bottom: 10px; font-size: 1.05rem; font-weight: 700; }
+  .about-section p, .about-section br, .about-section strong { color: #1a3d28; line-height: 1.75; }
+  .about-section a { color: #16a34a; font-weight: 600; text-decoration: none; }
+  .about-section a:hover { text-decoration: underline; color: #14532d; }
+
+  /* ── Tabs ── */
+  .stTabs [data-baseweb="tab-list"] {
+    gap: 4px; background: #f0fdf4; border-radius: 10px; padding: 5px;
+    border: 1.5px solid #bbf7d0;
+  }
+  .stTabs [data-baseweb="tab"] {
+    border-radius: 8px; padding: 7px 16px;
+    font-weight: 500; font-size: 0.85rem;
+    color: #166534 !important;
+    transition: all 0.2s;
+  }
+  .stTabs [data-baseweb="tab"]:hover { background: #dcfce7 !important; }
+  .stTabs [aria-selected="true"] {
+    background: #16a34a !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(22,163,74,0.3);
+  }
 </style>
 """, unsafe_allow_html=True)
 
