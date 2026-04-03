@@ -91,12 +91,18 @@ st.markdown("""
 # ── Data loading ───────────────────────────────────────────────
 @st.cache_data
 def load_data() -> pd.DataFrame:
-    csv_path = ROOT / "outputs" / "predictions" / "all_predictions.csv"
+    # Canonical path: <repo>/outputs/predictions/all_predictions.csv.gz
+    # Reads .csv.gz — pandas auto-detects gzip, no extra code needed
+    csv_path = ROOT / "outputs" / "predictions" / "all_predictions.csv.gz"
+    if not csv_path.exists():
+        csv_path = ROOT / "outputs" / "predictions" / "all_predictions.csv"
     if not csv_path.exists():
         st.error(
-            "**all_predictions.csv not found.**\n\n"
-            f"Expected: `{csv_path}`\n\n"
-            "Run Cell 37 in the Colab notebook, then push the CSV to GitHub."
+            f"**all_predictions.csv.gz not found.**\n\n"
+            f"Expected location: `outputs/all_predictions.csv` "
+            f"(relative to repo root).\n\n"
+            f"Run Cell 37 in Colab (generates .csv then compresses to .csv.gz), "
+            f"then push outputs/predictions/all_predictions.csv.gz to GitHub."
         )
         st.stop()
     return pd.read_csv(csv_path)
