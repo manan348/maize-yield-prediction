@@ -1,682 +1,591 @@
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import io
 import datetime
 from pathlib import Path
 
-# ── PDF imports ────────────────────────────────────────────────
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles    import getSampleStyleSheet
 from reportlab.platypus      import (SimpleDocTemplate, Paragraph,
                                       Spacer, Table, TableStyle)
 from reportlab.lib           import colors
 
-# ── Path resolution ────────────────────────────────────────────
 import sys
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-# ── Constants — updated from v25 notebook (5-year multi-location run) ─────
-CV_R2_NORM   = 0.355   # honest 3-fold CV on normalized yield
-CV_R2_RAW    = 0.62    # equivalent raw yield R² (reported to users)
+CV_R2_NORM   = 0.355
 TEST_R2_NORM = 0.361
-TEST_R2_RAW  = 0.62
 N_SAMPLES    = 46_686
 N_LOCATIONS  = 38
 N_HYBRIDS    = 2_912
 N_YEARS      = 5
 MODEL_NAME   = "XGBoost"
-DATASET      = "G2F 2014–2018"
-FEATURE_NOTE = "Genomics (SNPs) + Weather + Plant Traits + Soil"
+DATASET      = "G2F 2014-2018"
 
 st.set_page_config(
-    page_title="NeuroCrop — Maize Yield Predictor",
+    page_title="NeuroCrop - Maize Yield Predictor",
     page_icon="🌽",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ─────────────────────────────────────────────────
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
-
-  html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
-
-  h1, h2, h3 { font-family: 'DM Serif Display', serif; }
-
-  .hero-banner {
-    background: linear-gradient(135deg, #0f4c2a 0%, #1a7a45 50%, #0d3d22 100%);
-    border-radius: 16px;
-    padding: 32px 40px;
-    margin-bottom: 24px;
-    color: white;
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@300;600;800&family=Instrument+Sans:wght@300;400;500;600&display=swap');
+  html, body, [class*="css"] { font-family: 'Instrument Sans', sans-serif; }
+  h1, h2, h3 { font-family: 'Fraunces', serif; }
+  .hero {
+    background: linear-gradient(135deg, #071a0e 0%, #0d3320 40%, #14532d 75%, #166534 100%);
+    border-radius: 20px; padding: 40px 48px 36px; margin-bottom: 28px; position: relative; overflow: hidden;
   }
-  .hero-banner h1 { color: white; font-size: 2.4rem; margin: 0 0 4px 0; }
-  .hero-banner p  { color: #a8d5b5; margin: 0; font-size: 1rem; font-weight: 300; }
-
-  .metric-card {
-    background: #f8fdf9;
-    border: 1px solid #d0e8d8;
-    border-radius: 12px;
-    padding: 16px 20px;
-    text-align: center;
+  .hero::before {
+    content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 45%;
+    background: radial-gradient(ellipse at 80% 50%, rgba(74,222,128,0.08) 0%, transparent 70%);
   }
-  .metric-card .val { font-size: 1.8rem; font-weight: 600; color: #0f4c2a; font-family: 'DM Serif Display', serif; }
-  .metric-card .lbl { font-size: 0.78rem; color: #5a7a66; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
-
-  .insight-box {
-    background: #f0faf4;
-    border-left: 4px solid #1a7a45;
-    border-radius: 0 8px 8px 0;
-    padding: 14px 18px;
-    margin: 12px 0;
-    font-size: 0.92rem;
-    color: #1a3a25;
+  .hero h1 { color: #f0fdf4; font-size: 2.6rem; margin: 0 0 6px 0; font-weight: 800; letter-spacing: -0.02em; }
+  .hero .sub { color: #86efac; font-size: 0.95rem; font-weight: 300; letter-spacing: 0.04em; }
+  .hero .tag {
+    display: inline-block; background: rgba(74,222,128,0.15); border: 1px solid rgba(74,222,128,0.3);
+    color: #4ade80; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em;
+    padding: 3px 10px; border-radius: 20px; margin-right: 6px; margin-top: 12px; text-transform: uppercase;
   }
-
-  .stTabs [data-baseweb="tab-list"] { gap: 6px; }
-  .stTabs [data-baseweb="tab"] {
-    border-radius: 8px 8px 0 0;
-    padding: 8px 18px;
-    font-weight: 500;
-    font-size: 0.88rem;
-  }
+  .kpi { background: #f8fdf9; border: 1px solid #d1fae5; border-radius: 14px; padding: 18px 16px; text-align: center; }
+  .kpi .v { font-size: 1.9rem; font-weight: 600; color: #14532d; font-family: 'Fraunces', serif; }
+  .kpi .l { font-size: 0.72rem; color: #4b7a5e; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
+  .info-pill { background: #f0fdf4; border-left: 3px solid #22c55e; border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0; font-size: 0.89rem; color: #14532d; line-height: 1.6; }
+  .warn-pill  { background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0; font-size: 0.89rem; color: #78350f; }
+  .compare-card { background: white; border: 1px solid #e5f3eb; border-radius: 14px; padding: 20px; text-align: center; }
+  .compare-card .hn  { font-family: 'Fraunces', serif; font-size: 1.1rem; color: #14532d; font-weight: 600; }
+  .compare-card .yb  { font-size: 2.4rem; font-weight: 700; font-family: 'Fraunces', serif; }
+  .compare-card .yu  { font-size: 0.85rem; color: #6b7280; }
+  .about-section { background: #f8fdf9; border-radius: 14px; padding: 24px 28px; margin: 12px 0; }
+  .about-section h4 { font-family: 'Fraunces', serif; color: #14532d; margin-bottom: 8px; }
+  .stTabs [data-baseweb="tab-list"] { gap: 4px; background: #f0fdf4; border-radius: 10px; padding: 4px; }
+  .stTabs [data-baseweb="tab"] { border-radius: 8px; padding: 7px 16px; font-weight: 500; font-size: 0.85rem; }
+  .stTabs [aria-selected="true"] { background: white !important; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Data loading ───────────────────────────────────────────────
+# ── Data ──────────────────────────────────────────────────────
 @st.cache_data
-def load_data() -> pd.DataFrame:
-    # Canonical path: <repo>/outputs/predictions/all_predictions.csv.gz
-    # Reads .csv.gz — pandas auto-detects gzip, no extra code needed
-    csv_path = ROOT / "outputs" / "predictions" / "all_predictions.csv.gz"
-    if not csv_path.exists():
-        st.error(
-            f"**all_predictions.csv.gz not found.**\n\n"
-            f"Expected location: `outputs/predictions/all_predictions.csv.gz` "
-            f"(relative to repo root).\n\n"
-            f"Run Cell 37 in Colab to generate and compress the file, "
-            f"then push outputs/predictions/all_predictions.csv.gz to GitHub."
-        )
-        st.stop()
-    return pd.read_csv(csv_path)
+def load_data():
+    for name in ["all_predictions.csv.gz", "all_predictions.csv"]:
+        p = ROOT / "outputs" / "predictions" / name
+        if p.exists():
+            return pd.read_csv(p)
+    st.error("**all_predictions.csv.gz not found.**\n\nRun Cell 37 in Colab, then push `outputs/predictions/all_predictions.csv.gz` to GitHub.")
+    st.stop()
 
-df = load_data()
-
+df        = load_data()
 females   = sorted(df["Female"].unique().tolist())
 males     = sorted(df["Male"].unique().tolist())
 locations = sorted(df["Location"].unique().tolist())
 
-# ── Helpers ────────────────────────────────────────────────────
 @st.cache_data
-def location_yields(loc: str) -> pd.Series:
-    return df[df["Location"] == loc]["Yield"]
+def ov():
+    return {"mean": df["Yield"].mean(), "std": df["Yield"].std(),
+            "min": df["Yield"].min(), "max": df["Yield"].max(), "n": len(df)}
 
-def get_percentile(yield_val: float, loc: str) -> float:
-    sub = location_yields(loc)
-    return round(float((sub < yield_val).mean()) * 100, 1) if len(sub) else 0.0
+OV = ov()
 
-def category(y: float) -> str:
+def pct_rank(y, loc):
+    sub = df[df["Location"]==loc]["Yield"]
+    return round(float((sub < y).mean())*100, 1) if len(sub) else 0.
+
+def cat(y):
     if y >= 170: return "🟢 High"
     if y >= 150: return "🟡 Medium"
     return "🔴 Low"
 
-def lookup(p1: str, p2: str, loc: str):
-    res = df[(df["Female"] == p1) & (df["Male"] == p2) & (df["Location"] == loc)]
-    if len(res) == 0:
-        res = df[(df["Female"] == p2) & (df["Male"] == p1) & (df["Location"] == loc)]
-    return round(float(res.iloc[0]["Yield"]), 2) if len(res) > 0 else None
+def lookup(p1, p2, loc):
+    r = df[(df["Female"]==p1)&(df["Male"]==p2)&(df["Location"]==loc)]
+    if not len(r):
+        r = df[(df["Female"]==p2)&(df["Male"]==p1)&(df["Location"]==loc)]
+    return round(float(r.iloc[0]["Yield"]), 2) if len(r) else None
 
 @st.cache_data
-def stability_table() -> pd.DataFrame:
-    grp = df.groupby(["Female", "Male"])["Yield"]
-    tbl = grp.agg(
-        Mean_Yield=("mean"),
-        Std_Yield=("std"),
-        N_Locs=("count"),
-    ).reset_index()
-    tbl["CV_pct"]    = (tbl["Std_Yield"] / tbl["Mean_Yield"] * 100).round(1)
-    tbl["Hybrid"]    = tbl["Female"] + " × " + tbl["Male"]
-    tbl["Stability"] = tbl["CV_pct"].apply(
-        lambda v: "🟢 Stable" if v < 5 else ("🟡 Moderate" if v < 10 else "🔴 Unstable")
-    )
-    return tbl.sort_values("Mean_Yield", ascending=False).reset_index(drop=True)
+def stability_df():
+    g = df.groupby(["Female","Male"])["Yield"]
+    t = g.agg(Mean_Yield="mean", Std_Yield="std", N_Locs="count").reset_index()
+    t["CV_pct"]    = (t["Std_Yield"]/t["Mean_Yield"]*100).round(1)
+    t["Hybrid"]    = t["Female"]+" x "+t["Male"]
+    t["Stability"] = t["CV_pct"].apply(lambda v: "🟢 Stable" if v<5 else ("🟡 Moderate" if v<10 else "🔴 Unstable"))
+    return t.sort_values("Mean_Yield", ascending=False).reset_index(drop=True)
 
-# ── PDF ────────────────────────────────────────────────────────
-def generate_pdf_report(parent1, parent2, location, pred, loc_results, percentile):
-    buffer = io.BytesIO()
-    doc    = SimpleDocTemplate(buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-    story  = []
-
-    story.append(Paragraph("NeuroCrop — Maize Yield Prediction Report", styles["Title"]))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(
-        f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}  |  "
-        f"Model: {MODEL_NAME}  |  Dataset: {DATASET}",
-        styles["Normal"]
-    ))
-    story.append(Spacer(1, 14))
-
-    story.append(Paragraph("Model Performance", styles["Heading2"]))
-    story.append(Paragraph(
-        f"CV R² (honest) = {CV_R2_NORM:.3f}  |  Test R² = {TEST_R2_NORM:.3f}  |  "
-        f"Samples = {N_SAMPLES:,}  |  Locations = {N_LOCATIONS}  |  Years = {N_YEARS}",
-        styles["Normal"]
-    ))
-    story.append(Spacer(1, 14))
-
-    story.append(Paragraph("Prediction Summary", styles["Heading2"]))
-    cat_clean = category(pred).replace("🟢","").replace("🟡","").replace("🔴","").strip()
-    pred_data = [
-        ["Parameter",       "Value"],
-        ["Female Parent",   parent1],
-        ["Male Parent",     parent2],
-        ["Location",        location],
-        ["Predicted Yield", f"{pred} bu/A"],
-        ["Percentile Rank", f"Top {100 - percentile:.0f}% at this location"],
-        ["Category",        cat_clean],
-    ]
-    tbl = Table(pred_data, colWidths=[200, 300])
+# ── PDF ───────────────────────────────────────────────────────
+def make_pdf(p1, p2, loc, pred, loc_rows, percentile):
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter)
+    sty = getSampleStyleSheet(); s = []
+    s.append(Paragraph("NeuroCrop - Maize Yield Prediction Report", sty["Title"]))
+    s.append(Spacer(1,10))
+    s.append(Paragraph(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}  |  Model: {MODEL_NAME}  |  Dataset: {DATASET}", sty["Normal"]))
+    s.append(Spacer(1,14))
+    s.append(Paragraph("Model Performance", sty["Heading2"]))
+    s.append(Paragraph(f"CV R2 (honest) = {CV_R2_NORM:.3f}  |  Test R2 = {TEST_R2_NORM:.3f}  |  Samples = {N_SAMPLES:,}  |  Locations = {N_LOCATIONS}  |  Years = {N_YEARS}", sty["Normal"]))
+    s.append(Spacer(1,14))
+    s.append(Paragraph("Prediction Summary", sty["Heading2"]))
+    cs = cat(pred).replace("🟢","").replace("🟡","").replace("🔴","").strip()
+    data = [["Parameter","Value"],["Female Parent",p1],["Male Parent",p2],["Location",loc],
+            ["Predicted Yield",f"{pred} bu/A"],["Percentile",f"Top {100-percentile:.0f}%"],["Category",cs]]
+    tbl = Table(data, colWidths=[200,300])
     tbl.setStyle(TableStyle([
-        ("BACKGROUND",     (0, 0), (-1,  0), colors.HexColor("#0f4c2a")),
-        ("TEXTCOLOR",      (0, 0), (-1,  0), colors.white),
-        ("FONTNAME",       (0, 0), (-1,  0), "Helvetica-Bold"),
-        ("GRID",           (0, 0), (-1, -1), 1, colors.grey),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0faf4")]),
+        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#14532d")),("TEXTCOLOR",(0,0),(-1,0),colors.white),
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("GRID",(0,0),(-1,-1),1,colors.grey),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#f0fdf4")]),
     ]))
-    story.append(tbl)
-    story.append(Spacer(1, 20))
-
-    if loc_results:
-        story.append(Paragraph("All Locations — Top 10", styles["Heading2"]))
-        loc_data = [["Rank", "Location", "Yield (bu/A)", "Category"]]
-        for i, row in enumerate(loc_results[:10], 1):
-            cat_str = category(row["Yield"]).replace("🟢","").replace("🟡","").replace("🔴","").strip()
-            loc_data.append([str(i), row["Location"], str(row["Yield"]), cat_str])
-        loc_tbl = Table(loc_data, colWidths=[50, 150, 150, 150])
-        loc_tbl.setStyle(TableStyle([
-            ("BACKGROUND",     (0, 0), (-1,  0), colors.HexColor("#0f4c2a")),
-            ("TEXTCOLOR",      (0, 0), (-1,  0), colors.white),
-            ("FONTNAME",       (0, 0), (-1,  0), "Helvetica-Bold"),
-            ("GRID",           (0, 0), (-1, -1), 1, colors.grey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0faf4")]),
-        ]))
-        story.append(loc_tbl)
-
-    story.append(Spacer(1, 30))
-    story.append(Paragraph(
-        f"NeuroCrop — Generative Breeding Platform  |  Abdul Manan  |  {DATASET}",
-        styles["Normal"]
-    ))
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
+    s.append(tbl); s.append(Spacer(1,20))
+    if loc_rows:
+        s.append(Paragraph("Top Locations", sty["Heading2"]))
+        ld = [["Rank","Location","Yield (bu/A)","Category"]]
+        for i,r in enumerate(loc_rows[:10],1):
+            ld.append([str(i),r["Location"],str(r["Yield"]),cat(r["Yield"]).replace("🟢","").replace("🟡","").replace("🔴","").strip()])
+        lt = Table(ld, colWidths=[50,150,150,150])
+        lt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#14532d")),("TEXTCOLOR",(0,0),(-1,0),colors.white),
+                                  ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("GRID",(0,0),(-1,-1),1,colors.grey),
+                                  ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#f0fdf4")])]))
+        s.append(lt)
+    s.append(Spacer(1,30))
+    s.append(Paragraph(f"NeuroCrop - Generative Breeding Platform  |  Abdul Manan  |  {DATASET}", sty["Normal"]))
+    doc.build(s); buf.seek(0); return buf
 
 # ══════════════════════════════════════════════════════════════
 # HEADER
 # ══════════════════════════════════════════════════════════════
 st.markdown(f"""
-<div class="hero-banner">
+<div class="hero">
   <h1>🌽 NeuroCrop</h1>
-  <p>Generative Breeding Platform · Maize Hybrid Yield Prediction · {DATASET} · {MODEL_NAME}</p>
+  <div class="sub">GENERATIVE BREEDING PLATFORM  ·  MAIZE HYBRID YIELD PREDICTION</div>
+  <div>
+    <span class="tag">XGBoost</span><span class="tag">Genomics + Environment</span>
+    <span class="tag">5-Year Multi-Location</span><span class="tag">G×E Modelling</span>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
-# Metric strip
-c1, c2, c3, c4, c5, c6 = st.columns(6)
+cols = st.columns(7)
 for col, val, lbl in [
-    (c1, f"{CV_R2_NORM:.3f}",    "CV R² (honest)"),
-    (c2, f"{TEST_R2_NORM:.3f}",  "Test R²"),
-    (c3, f"{N_SAMPLES:,}",       "Training Samples"),
-    (c4, f"{N_LOCATIONS}",       "Locations"),
-    (c5, f"{N_HYBRIDS:,}",       "Hybrids"),
-    (c6, f"{N_YEARS} yrs",       "Years (G2F)"),
+    (cols[0], f"{CV_R2_NORM:.3f}", "CV R² (honest)"),
+    (cols[1], f"{TEST_R2_NORM:.3f}", "Test R²"),
+    (cols[2], f"{N_SAMPLES:,}", "Samples"),
+    (cols[3], f"{N_LOCATIONS}", "Locations"),
+    (cols[4], f"{N_HYBRIDS:,}", "Hybrids"),
+    (cols[5], f"{N_YEARS} yrs", "G2F Years"),
+    (cols[6], f"{OV['n']:,}", "Predictions"),
 ]:
-    col.markdown(f"""
-    <div class="metric-card">
-      <div class="val">{val}</div>
-      <div class="lbl">{lbl}</div>
-    </div>""", unsafe_allow_html=True)
+    col.markdown(f'<div class="kpi"><div class="v">{val}</div><div class="l">{lbl}</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Feature importance callout
-st.markdown("""
-<div class="insight-box">
-  <strong>Model inputs:</strong> Genomics (top 10k SNPs via mid-parent PCA) · 
-  Season weather (May–Sep) · Critical-period weather (Jun–Aug) · 
-  Soil properties · Plant morphology traits · 38 US field locations
-</div>
-""", unsafe_allow_html=True)
-
-# ── Sidebar ────────────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────────────────────
 st.sidebar.markdown("## 🔬 Select Hybrid")
 default_f = females.index("B73")  if "B73"  in females else 0
 default_m = males.index("Mo17")   if "Mo17" in males   else 0
-
-female   = st.sidebar.selectbox("Female Parent", females,   index=default_f)
-male     = st.sidebar.selectbox("Male Parent",   males,     index=default_m)
+female   = st.sidebar.selectbox("Female Parent", females, index=default_f)
+male     = st.sidebar.selectbox("Male Parent",   males,   index=default_m)
 location = st.sidebar.selectbox("Location",      locations)
-
 st.sidebar.markdown("---")
-st.sidebar.markdown(f"""
-**Model:** {MODEL_NAME}  
-**CV R²:** {CV_R2_NORM:.3f} (honest)  
-**Test R²:** {TEST_R2_NORM:.3f}  
-**Samples:** {N_SAMPLES:,}  
-**Dataset:** {DATASET}  
-""")
+st.sidebar.markdown(f"**Model:** {MODEL_NAME}  \n**CV R²:** {CV_R2_NORM:.3f}  \n**Test R²:** {TEST_R2_NORM:.3f}  \n**Samples:** {N_SAMPLES:,}  \n**Hybrids:** {N_HYBRIDS:,}")
+st.sidebar.markdown("---")
+st.sidebar.caption("NeuroCrop · Abdul Manan")
 
 # ══════════════════════════════════════════════════════════════
-# TABS
+# TABS — 10 total (6 existing + 4 new)
 # ══════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+(tab1, tab2, tab3, tab4, tab5,
+ tab6, tab7, tab8, tab9, tab10) = st.tabs([
     "🔮 Predict",
     "📍 Best Location",
     "🏆 Best Cross",
+    "⚖️ Compare Hybrids",    # NEW
     "🔄 G×E Analysis",
     "📊 Stability",
+    "📈 Yield Explorer",     # NEW
     "📦 Batch Predict",
+    "🧠 Model Insights",     # NEW
+    "ℹ️ About",               # NEW
 ])
 
-# ══════════════════════════════════════════════════════════════
-# TAB 1 — Single prediction
-# ══════════════════════════════════════════════════════════════
+# TAB 1 — Predict ─────────────────────────────────────────────
 with tab1:
-    st.subheader(f"Prediction: {female} × {male} @ {location}")
+    st.subheader(f"Prediction: {female} x {male} @ {location}")
     pred = lookup(female, male, location)
-
     if pred:
-        pct = get_percentile(pred, location)
-
-        m1, m2, m3, m4 = st.columns(4)
+        p = pct_rank(pred, location)
+        m1,m2,m3,m4 = st.columns(4)
         m1.metric("Predicted Yield",  f"{pred} bu/A")
-        m2.metric("Percentile Rank",  f"Top {100 - pct:.0f}%",
-                  help="Rank vs all predicted crosses at this location")
-        m3.metric("Female Parent",    female)
-        m4.metric("Male Parent",      male)
-
-        cat = category(pred)
-        if   "High"   in cat: st.success(f"{cat} Yield")
-        elif "Medium" in cat: st.warning(f"{cat} Yield")
-        else:                 st.error(f"{cat} Yield")
-
-        # Gauge
+        m2.metric("Percentile Rank",  f"Top {100-p:.0f}%", help="vs all crosses at this location")
+        m3.metric("vs Overall Avg",   f"{pred-OV['mean']:+.1f} bu/A")
+        m4.metric("Category",         cat(pred))
+        c = cat(pred)
+        if "High" in c:   st.success(f"{c} Yield")
+        elif "Medium" in c: st.warning(f"{c} Yield")
+        else:               st.error(f"{c} Yield")
         fig = go.Figure(go.Indicator(
-            mode="gauge+number+delta",
-            value=pred,
-            title={"text": "Predicted Yield (bu/A)", "font": {"size": 16}},
-            delta={"reference": df["Yield"].mean(), "suffix": " bu/A vs avg"},
-            gauge={
-                "axis": {"range": [df["Yield"].min(), df["Yield"].max()]},
-                "bar":  {"color": "#1a7a45"},
-                "steps": [
-                    {"range": [df["Yield"].min(), 150], "color": "#fde8e8"},
-                    {"range": [150, 170],               "color": "#fef9c3"},
-                    {"range": [170, df["Yield"].max()], "color": "#dcfce7"},
-                ],
-                "threshold": {
-                    "line": {"color": "#0f4c2a", "width": 3},
-                    "thickness": 0.8,
-                    "value": df["Yield"].mean(),
-                },
-            }
-        ))
-        fig.update_layout(height=340, margin=dict(t=40, b=10))
+            mode="gauge+number+delta", value=pred,
+            title={"text":"Predicted Yield (bu/A)","font":{"size":15}},
+            delta={"reference":OV["mean"],"suffix":" vs avg"},
+            gauge={"axis":{"range":[OV["min"],OV["max"]]},"bar":{"color":"#16a34a"},
+                   "steps":[{"range":[OV["min"],150],"color":"#fde8e8"},{"range":[150,170],"color":"#fef9c3"},{"range":[170,OV["max"]],"color":"#dcfce7"}],
+                   "threshold":{"line":{"color":"#14532d","width":3},"thickness":0.8,"value":OV["mean"]}}))
+        fig.update_layout(height=330, margin=dict(t=40,b=10))
         st.plotly_chart(fig, use_container_width=True)
-
-        # Feature importance context
-        st.markdown("""
-        <div class="insight-box">
-          <strong>What drives this prediction:</strong>
-          Genetics (PCA) 41% · Plant traits 24% · Season weather 19% · Critical-period weather 16%
-        </div>""", unsafe_allow_html=True)
-
+        st.markdown('<div class="info-pill"><strong>Feature contribution:</strong> Genetics 41% · Plant traits 24% · Season weather 19% · Critical-period weather 16%</div>', unsafe_allow_html=True)
         st.markdown("---")
-
         @st.cache_data
-        def _loc_results_for_pdf(p1, p2):
-            rows = []
-            for loc in locations:
-                p = lookup(p1, p2, loc)
-                if p:
-                    rows.append({"Location": loc, "Yield": p})
-            return sorted(rows, key=lambda x: x["Yield"], reverse=True)
-
-        pdf_buf = generate_pdf_report(
-            female, male, location, pred,
-            _loc_results_for_pdf(female, male), pct
-        )
-        st.download_button(
-            label="📄 Download PDF Report",
-            data=pdf_buf,
-            file_name=f"neurocrop_{female}_{male}_{location}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
+        def _pdf_locs(p1, p2):
+            return sorted([{"Location":l,"Yield":v} for l in locations if (v:=lookup(p1,p2,l))], key=lambda x: x["Yield"], reverse=True)
+        pdf = make_pdf(female, male, location, pred, _pdf_locs(female, male), p)
+        st.download_button("📄 Download PDF Report", pdf, f"neurocrop_{female}_{male}_{location}.pdf", "application/pdf", use_container_width=True)
     else:
         st.warning("Combination not found in database.")
 
-# ══════════════════════════════════════════════════════════════
-# TAB 2 — Best location for a cross
-# ══════════════════════════════════════════════════════════════
+# TAB 2 — Best Location ───────────────────────────────────────
 with tab2:
-    st.subheader(f"Best Locations for {female} × {male}")
-
+    st.subheader(f"Best Locations for {female} x {male}")
     @st.cache_data
-    def _best_locations(p1, p2):
-        rows = []
-        for loc in locations:
-            p = lookup(p1, p2, loc)
-            if p:
-                rows.append({
-                    "Location":   loc,
-                    "Yield":      p,
-                    "Percentile": get_percentile(p, loc),
-                    "Category":   category(p),
-                })
+    def _best_locs(p1, p2):
+        rows = [{"Location":l,"Yield":v,"Percentile":pct_rank(v,l),"Category":cat(v)} for l in locations if (v:=lookup(p1,p2,l))]
         return pd.DataFrame(rows).sort_values("Yield", ascending=False).reset_index(drop=True)
-
-    res_df = _best_locations(female, male)
-
-    if len(res_df):
-        res_df.index += 1
-        best = res_df.iloc[0]
-        st.success(f"🏆 Best location: **{best['Location']}** → {best['Yield']} bu/A")
-
-        fig = px.bar(
-            res_df, x="Location", y="Yield",
-            color="Yield", color_continuous_scale="RdYlGn",
-            title=f"{female} × {male} — Yield by Location",
-            text="Yield", template="plotly_white",
-        )
+    res = _best_locs(female, male)
+    if len(res):
+        res.index += 1
+        b = res.iloc[0]
+        st.success(f"🏆 Best: **{b['Location']}** → {b['Yield']} bu/A  (Top {100-b['Percentile']:.0f}%)")
+        fig = px.bar(res, x="Location", y="Yield", color="Yield", color_continuous_scale="RdYlGn",
+                     title=f"{female} x {male} — Yield by Location", text="Yield", template="plotly_white")
         fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-        fig.update_layout(xaxis_tickangle=-45, height=450, showlegend=False,
-                          plot_bgcolor="#f8fdf9")
+        fig.update_layout(xaxis_tickangle=-45, height=450, showlegend=False, plot_bgcolor="#f8fdf9")
         st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(res_df, use_container_width=True)
+        st.dataframe(res, use_container_width=True)
+        st.download_button("📥 Download CSV", res.to_csv(index=False), f"best_locs_{female}_{male}.csv")
 
-        st.download_button(
-            "📥 Download CSV",
-            res_df.to_csv(index=False),
-            f"best_locations_{female}_{male}.csv",
-        )
-
-# ══════════════════════════════════════════════════════════════
-# TAB 3 — Best cross at a location
-# ══════════════════════════════════════════════════════════════
+# TAB 3 — Best Cross ──────────────────────────────────────────
 with tab3:
     st.subheader(f"Top Crosses at {location}")
-    top_n = st.slider("Show top N crosses", 5, 50, 20)
-
-    cross_df = df[df["Location"] == location].copy()
-    cross_df["Cross"] = cross_df["Female"] + " × " + cross_df["Male"]
-    loc_yields_s = cross_df["Yield"]
-    cross_df["Percentile"] = cross_df["Yield"].apply(
-        lambda v: round(float((loc_yields_s < v).mean()) * 100, 1)
-    )
-    cross_df = (cross_df
-                .sort_values("Yield", ascending=False)
-                .head(top_n)
-                .reset_index(drop=True))
+    top_n = st.slider("Show top N", 5, 50, 20)
+    cross_df = df[df["Location"]==location].copy()
+    cross_df["Cross"] = cross_df["Female"]+" x "+cross_df["Male"]
+    cross_df = cross_df.sort_values("Yield", ascending=False).head(top_n).reset_index(drop=True)
     cross_df.index += 1
-
-    fig = px.bar(
-        cross_df, x="Yield", y="Cross", orientation="h",
-        color="Yield", color_continuous_scale="RdYlGn",
-        title=f"Top {top_n} Crosses at {location}",
-        text="Yield", template="plotly_white",
-    )
+    fig = px.bar(cross_df, x="Yield", y="Cross", orientation="h", color="Yield",
+                 color_continuous_scale="RdYlGn", title=f"Top {top_n} Crosses at {location}",
+                 text="Yield", template="plotly_white")
     fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-    fig.update_layout(
-        height=max(400, top_n * 25), showlegend=False,
-        yaxis={"categoryorder": "total ascending"},
-        plot_bgcolor="#f8fdf9",
-    )
+    fig.update_layout(height=max(400,top_n*25), showlegend=False, yaxis={"categoryorder":"total ascending"}, plot_bgcolor="#f8fdf9")
     st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(cross_df[["Cross", "Yield", "Percentile"]], use_container_width=True)
+    st.dataframe(cross_df[["Cross","Yield"]], use_container_width=True)
+    st.download_button("📥 Download CSV", cross_df.to_csv(index=False), f"top_crosses_{location}.csv")
 
-    st.download_button(
-        "📥 Download CSV",
-        cross_df.to_csv(index=False),
-        f"top_crosses_{location}.csv",
-    )
-
-# ══════════════════════════════════════════════════════════════
-# TAB 4 — G×E interaction
-# ══════════════════════════════════════════════════════════════
+# TAB 4 — Compare Hybrids (NEW) ───────────────────────────────
 with tab4:
+    st.subheader("⚖️ Side-by-Side Hybrid Comparison")
+    st.markdown('<div class="info-pill">Compare up to 4 hybrids — yields, location rankings, and stability metrics. Great for choosing between breeding candidates before committing to field trials.</div>', unsafe_allow_html=True)
+    n_comp = st.radio("Number of hybrids to compare", [2, 3, 4], horizontal=True)
+    hybs   = []
+    cols   = st.columns(n_comp)
+    for i, col in enumerate(cols):
+        with col:
+            st.markdown(f"**Hybrid {i+1}**")
+            fi = col.selectbox(f"Female {i+1}", females, key=f"cf{i}", index=min(i*3,len(females)-1))
+            mi = col.selectbox(f"Male {i+1}",   males,   key=f"cm{i}", index=min(i*2,len(males)-1))
+            li = col.selectbox(f"Location {i+1}", locations, key=f"cl{i}")
+            hybs.append((fi, mi, li))
+    st.markdown("---")
+    card_cols = st.columns(n_comp)
+    comp_rows = []
+    for i,(fi,mi,li) in enumerate(hybs):
+        v = lookup(fi, mi, li)
+        with card_cols[i]:
+            if v:
+                p_ = pct_rank(v, li); c_ = cat(v)
+                color = "#16a34a" if "High" in c_ else ("#f59e0b" if "Medium" in c_ else "#dc2626")
+                st.markdown(f'<div class="compare-card"><div class="hn">{fi} x {mi}</div><div style="font-size:0.75rem;color:#6b7280;margin-bottom:8px">{li}</div><div class="yb" style="color:{color}">{v}</div><div class="yu">bu/A</div><div style="margin-top:8px;font-size:0.8rem;color:#4b7a5e">Top {100-p_:.0f}% at location</div><div style="font-size:0.85rem;margin-top:4px">{c_}</div></div>', unsafe_allow_html=True)
+                comp_rows.append({"Hybrid":f"{fi} x {mi}","Location":li,"Yield":v,"Percentile":100-p_,"Category":c_})
+            else:
+                st.warning(f"No data for {fi} x {mi} @ {li}")
+    if len(comp_rows) > 1:
+        st.markdown("<br>", unsafe_allow_html=True)
+        comp_df = pd.DataFrame(comp_rows)
+        comp_df["Label"] = comp_df["Hybrid"]+"\n@"+comp_df["Location"]
+        fig = px.bar(comp_df, x="Label", y="Yield", color="Yield", color_continuous_scale="RdYlGn",
+                     text="Yield", title="Yield Comparison", template="plotly_white")
+        fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+        fig.update_layout(height=360, showlegend=False, plot_bgcolor="#f8fdf9", xaxis_title="", yaxis_title="Predicted Yield (bu/A)")
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("**Performance across ALL locations:**")
+        prof = []
+        for fi,mi,_ in hybs:
+            for l in locations:
+                v = lookup(fi,mi,l)
+                if v: prof.append({"Hybrid":f"{fi} x {mi}","Location":l,"Yield":v})
+        if prof:
+            prof_df = pd.DataFrame(prof)
+            fig2 = px.line(prof_df, x="Location", y="Yield", color="Hybrid", markers=True,
+                           title="Yield Profile Across All Locations", template="plotly_white")
+            fig2.update_layout(height=400, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9")
+            st.plotly_chart(fig2, use_container_width=True)
+        stab = stability_df()
+        summ = []
+        for fi,mi,li in hybs:
+            v = lookup(fi,mi,li); row = stab[(stab["Female"]==fi)&(stab["Male"]==mi)]
+            summ.append({"Hybrid":f"{fi} x {mi}","Location":li,"Predicted":v or "—",
+                         "Mean (all locs)":f"{row['Mean_Yield'].values[0]:.1f}" if len(row) else "—",
+                         "CV%":f"{row['CV_pct'].values[0]:.1f}" if len(row) else "—",
+                         "Stability":row["Stability"].values[0] if len(row) else "—"})
+        st.dataframe(pd.DataFrame(summ), use_container_width=True, hide_index=True)
+        st.download_button("📥 Download CSV", comp_df.to_csv(index=False), "comparison.csv")
+
+# TAB 5 — G×E Analysis ────────────────────────────────────────
+with tab5:
     st.subheader("G×E Interaction Analysis")
-    st.markdown("""
-    <div class="insight-box">
-      G×E interaction = how the same hybrid responds differently across environments.
-      Crossing lines in the chart = strong G×E (location-specific adaptation).
-      Parallel lines = stable, wide-adapted hybrids.
-    </div>""", unsafe_allow_html=True)
-
-    sel_females = st.multiselect(
-        "Select Female Parents", females, default=females[:3]
-    )
-    fixed_male = st.selectbox(
-        "Fixed Male Parent", males,
-        index=males.index("Mo17") if "Mo17" in males else 0,
-        key="ge_male",
-    )
-
-    if sel_females:
-        ge_df = df[
-            df["Female"].isin(sel_females) & (df["Male"] == fixed_male)
-        ].copy()
-        ge_df["Hybrid"] = ge_df["Female"] + " × " + ge_df["Male"]
-
-        if len(ge_df) > 0:
-            fig = px.line(
-                ge_df, x="Location", y="Yield", color="Hybrid",
-                markers=True, title="G×E Interaction Across Locations",
-                template="plotly_white",
-            )
-            fig.add_hline(
-                y=ge_df["Yield"].mean(), line_dash="dash",
-                line_color="#0f4c2a",
-                annotation_text=f"Grand Mean ({ge_df['Yield'].mean():.1f} bu/A)",
-            )
-            fig.update_layout(height=500, xaxis_tickangle=-45,
-                              plot_bgcolor="#f8fdf9")
+    st.markdown('<div class="info-pill">Crossing lines = strong G×E (location-specific adaptation). Parallel lines = stable, wide-adapted hybrid.</div>', unsafe_allow_html=True)
+    sel_f = st.multiselect("Select Female Parents", females, default=females[:3])
+    fix_m = st.selectbox("Fixed Male Parent", males, index=males.index("Mo17") if "Mo17" in males else 0, key="ge_male")
+    if sel_f:
+        ge = df[df["Female"].isin(sel_f)&(df["Male"]==fix_m)].copy()
+        ge["Hybrid"] = ge["Female"]+" x "+ge["Male"]
+        if len(ge):
+            fig = px.line(ge, x="Location", y="Yield", color="Hybrid", markers=True, title="G×E Interaction", template="plotly_white")
+            fig.add_hline(y=ge["Yield"].mean(), line_dash="dash", line_color="#14532d", annotation_text=f"Grand Mean ({ge['Yield'].mean():.1f} bu/A)")
+            fig.update_layout(height=480, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9")
             st.plotly_chart(fig, use_container_width=True)
-
-            pivot = ge_df.pivot_table(
-                index="Hybrid", columns="Location",
-                values="Yield", aggfunc="mean"
-            )
+            pivot = ge.pivot_table(index="Hybrid", columns="Location", values="Yield", aggfunc="mean")
             if not pivot.empty:
-                fig2 = px.imshow(
-                    pivot, color_continuous_scale="RdYlGn",
-                    title="Yield Heatmap (bu/A) — Genotype × Environment",
-                    text_auto=".1f", template="plotly_white",
-                )
-                fig2.update_layout(height=max(300, len(sel_females) * 60 + 150))
+                fig2 = px.imshow(pivot, color_continuous_scale="RdYlGn", title="G×E Heatmap (bu/A)", text_auto=".0f", template="plotly_white")
+                fig2.update_layout(height=max(280, len(sel_f)*65+120))
                 st.plotly_chart(fig2, use_container_width=True)
         else:
             st.info("No data for the selected combination.")
 
-# ══════════════════════════════════════════════════════════════
-# TAB 5 — Stability ranking
-# ══════════════════════════════════════════════════════════════
-with tab5:
-    st.subheader("G×E Stability Ranking")
-    st.markdown("""
-    <div class="insight-box">
-      <strong>CV%</strong> = coefficient of variation across locations.
-      Lower CV% = consistently high yield everywhere (wide adaptation).
-      This is the core of <em>generative breeding</em>: identify crosses that are
-      both high-yielding <em>and</em> stable — reducing the need for expensive multi-location trials.
-    </div>""", unsafe_allow_html=True)
-
-    stab = stability_table()
-
-    c1, c2 = st.columns(2)
-    min_mean = c1.slider("Min mean yield (bu/A)", int(df["Yield"].min()),
-                         int(df["Yield"].max()), 150)
-    max_cv   = c2.slider("Max CV% (stability threshold)", 1, 30, 10)
-
-    filtered = stab[
-        (stab["Mean_Yield"] >= min_mean) & (stab["CV_pct"] <= max_cv)
-    ].head(50)
-
-    if len(filtered):
-        st.success(f"**{len(filtered)} hybrids** match: high yield + environmentally stable")
-
-        fig = px.scatter(
-            filtered, x="CV_pct", y="Mean_Yield",
-            color="Stability", hover_data=["Hybrid", "N_Locs"],
-            color_discrete_map={
-                "🟢 Stable":   "#16a34a",
-                "🟡 Moderate": "#ca8a04",
-                "🔴 Unstable": "#dc2626",
-            },
-            title="Yield vs Stability — Ideal: top-right (high yield, low CV%)",
-            labels={"CV_pct": "CV% across locations (lower = more stable)",
-                    "Mean_Yield": "Mean Yield (bu/A)"},
-            template="plotly_white",
-        )
-        fig.update_layout(height=450, plot_bgcolor="#f8fdf9")
-        st.plotly_chart(fig, use_container_width=True)
-
-        show_cols = ["Hybrid", "Mean_Yield", "Std_Yield", "CV_pct", "N_Locs", "Stability"]
-        st.dataframe(filtered[show_cols].reset_index(drop=True), use_container_width=True)
-
-        st.download_button(
-            "📥 Download Stability Table",
-            filtered[show_cols].to_csv(index=False),
-            "neurocrop_stability_ranking.csv",
-        )
-    else:
-        st.warning("No hybrids match the current filters. Try relaxing the thresholds.")
-
-# ══════════════════════════════════════════════════════════════
-# TAB 6 — Batch prediction
-# ══════════════════════════════════════════════════════════════
+# TAB 6 — Stability ───────────────────────────────────────────
 with tab6:
+    st.subheader("G×E Stability Ranking")
+    st.markdown('<div class="info-pill"><strong>CV%</strong> = coefficient of variation across locations. Lower = stable everywhere. Core of generative breeding: high-yielding AND stable crosses reduce trial costs.</div>', unsafe_allow_html=True)
+    stab = stability_df()
+    c1, c2 = st.columns(2)
+    min_m = c1.slider("Min mean yield (bu/A)", int(df["Yield"].min()), int(df["Yield"].max()), 150)
+    max_c = c2.slider("Max CV%", 1, 30, 10)
+    filt  = stab[(stab["Mean_Yield"]>=min_m)&(stab["CV_pct"]<=max_c)].head(50)
+    if len(filt):
+        st.success(f"**{len(filt)} hybrids** — high yield + stable")
+        fig = px.scatter(filt, x="CV_pct", y="Mean_Yield", color="Stability",
+                         hover_data=["Hybrid","N_Locs"],
+                         color_discrete_map={"🟢 Stable":"#16a34a","🟡 Moderate":"#ca8a04","🔴 Unstable":"#dc2626"},
+                         title="Yield vs Stability", labels={"CV_pct":"CV% (lower = more stable)","Mean_Yield":"Mean Yield (bu/A)"},
+                         template="plotly_white")
+        fig.update_layout(height=440, plot_bgcolor="#f8fdf9")
+        st.plotly_chart(fig, use_container_width=True)
+        show = ["Hybrid","Mean_Yield","Std_Yield","CV_pct","N_Locs","Stability"]
+        st.dataframe(filt[show].reset_index(drop=True), use_container_width=True)
+        st.download_button("📥 Download Table", filt[show].to_csv(index=False), "stability.csv")
+    else:
+        st.warning("No hybrids match. Try relaxing the filters.")
+
+# TAB 7 — Yield Explorer (NEW) ────────────────────────────────
+with tab7:
+    st.subheader("📈 Yield Explorer — Database Analytics")
+    st.markdown('<div class="info-pill">Explore yield distributions, location rankings, and parent effects across all predictions.</div>', unsafe_allow_html=True)
+    et1, et2, et3 = st.tabs(["Distribution", "By Location", "Parent Effects"])
+
+    with et1:
+        fig = px.histogram(df, x="Yield", nbins=60,
+                           title=f"Global Yield Distribution ({OV['n']:,} predictions)",
+                           color_discrete_sequence=["#16a34a"], template="plotly_white")
+        fig.add_vline(x=OV["mean"], line_dash="dash", line_color="#14532d", annotation_text=f"Mean: {OV['mean']:.1f}")
+        fig.add_vline(x=150, line_dash="dot", line_color="orange",  annotation_text="Medium threshold")
+        fig.add_vline(x=170, line_dash="dot", line_color="#16a34a", annotation_text="High threshold")
+        fig.update_layout(height=380, plot_bgcolor="#f8fdf9")
+        st.plotly_chart(fig, use_container_width=True)
+        c1,c2,c3,c4 = st.columns(4)
+        c1.metric("Mean",  f"{OV['mean']:.1f} bu/A")
+        c2.metric("Std",   f"{OV['std']:.1f} bu/A")
+        c3.metric("Min",   f"{OV['min']:.1f} bu/A")
+        c4.metric("Max",   f"{OV['max']:.1f} bu/A")
+        ph = (df["Yield"]>=170).mean()*100; pm = ((df["Yield"]>=150)&(df["Yield"]<170)).mean()*100; pl = (df["Yield"]<150).mean()*100
+        fig2 = px.pie(values=[ph,pm,pl], names=["High (>=170)","Medium (150-170)","Low (<150)"],
+                      color_discrete_sequence=["#16a34a","#ca8a04","#dc2626"], title="Category Distribution", hole=0.45, template="plotly_white")
+        fig2.update_layout(height=300)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    with et2:
+        ls = df.groupby("Location")["Yield"].agg(Mean="mean", Std="std", N="count").reset_index().sort_values("Mean", ascending=False)
+        fig = px.bar(ls, x="Location", y="Mean", error_y="Std", color="Mean", color_continuous_scale="RdYlGn",
+                     title="Mean Predicted Yield by Location (+/-1 std)", template="plotly_white")
+        fig.update_layout(height=460, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9", showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+        st.dataframe(ls.reset_index(drop=True), use_container_width=True)
+        st.download_button("📥 Location Stats CSV", ls.to_csv(index=False), "location_stats.csv")
+
+    with et3:
+        st.markdown("**Top 20 Female Parents by Mean Yield**")
+        fs = df.groupby("Female")["Yield"].mean().sort_values(ascending=False).head(20).reset_index()
+        fs.columns = ["Female","Mean Yield"]
+        fig = px.bar(fs, x="Female", y="Mean Yield", color="Mean Yield", color_continuous_scale="Greens",
+                     title="Top 20 Female Parents", template="plotly_white")
+        fig.update_layout(height=360, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9", showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("**Top 20 Male Parents by Mean Yield**")
+        ms = df.groupby("Male")["Yield"].mean().sort_values(ascending=False).head(20).reset_index()
+        ms.columns = ["Male","Mean Yield"]
+        fig2 = px.bar(ms, x="Male", y="Mean Yield", color="Mean Yield", color_continuous_scale="Blues",
+                      title="Top 20 Male Parents", template="plotly_white")
+        fig2.update_layout(height=360, xaxis_tickangle=-45, plot_bgcolor="#f8fdf9", showlegend=False)
+        st.plotly_chart(fig2, use_container_width=True)
+
+# TAB 8 — Batch Predict ───────────────────────────────────────
+with tab8:
     st.subheader("📦 Batch Yield Prediction")
     st.markdown("Upload a CSV with columns: **Female, Male, Location**")
-
-    sample = pd.DataFrame({
-        "Female":   ["B73",  "A632",  "Oh43"],
-        "Male":     ["Mo17", "Mo17",  "Mo17"],
-        "Location": ["ILH1", "WIH1",  "IAH4"],
-    })
-    st.markdown("**Sample input format:**")
+    sample = pd.DataFrame({"Female":["B73","A632","Oh43"],"Male":["Mo17","Mo17","Mo17"],"Location":["ILH1","WIH1","IAH4"]})
     st.dataframe(sample, use_container_width=True)
-    st.download_button(
-        "📥 Download Template CSV",
-        sample.to_csv(index=False),
-        "template.csv", "text/csv",
-    )
-
+    st.download_button("📥 Download Template", sample.to_csv(index=False), "template.csv", "text/csv")
     st.markdown("---")
-    uploaded = st.file_uploader("Upload your CSV file", type=["csv"])
-
+    uploaded = st.file_uploader("Upload CSV", type=["csv"])
     if uploaded:
-        input_df = pd.read_csv(uploaded)
-        st.markdown(f"**Uploaded: {len(input_df)} rows**")
-        st.dataframe(input_df.head(), use_container_width=True)
+        inp = pd.read_csv(uploaded)
+        st.markdown(f"**{len(inp)} rows**")
+        st.dataframe(inp.head(), use_container_width=True)
+        miss = [c for c in ["Female","Male","Location"] if c not in inp.columns]
+        if miss:
+            st.error(f"Missing columns: {miss}")
+        elif st.button("🔮 Run All Predictions", type="primary", use_container_width=True):
+            results, errors = [], []
+            prog = st.progress(0); stat = st.empty()
+            for i, row in inp.iterrows():
+                p1, p2, loc = str(row["Female"]).strip(), str(row["Male"]).strip(), str(row["Location"]).strip()
+                v = lookup(p1, p2, loc)
+                if v: results.append({"Female":p1,"Male":p2,"Location":loc,"Predicted Yield":v,"Percentile":pct_rank(v,loc),"Category":cat(v)})
+                else: errors.append({"Female":p1,"Male":p2,"Location":loc,"Error":"Not found"})
+                prog.progress((i+1)/len(inp)); stat.text(f"Processing {i+1}/{len(inp)}...")
+            prog.empty(); stat.empty()
+            if results:
+                res = pd.DataFrame(results).sort_values("Predicted Yield", ascending=False).reset_index(drop=True)
+                res.index += 1
+                st.success(f"✅ {len(results)} predictions")
+                if errors: st.warning(f"⚠️ {len(errors)} not found")
+                m1,m2,m3 = st.columns(3)
+                m1.metric("Best",    f"{res['Predicted Yield'].max():.1f} bu/A")
+                m2.metric("Average", f"{res['Predicted Yield'].mean():.1f} bu/A")
+                m3.metric("Worst",   f"{res['Predicted Yield'].min():.1f} bu/A")
+                st.dataframe(res, use_container_width=True)
+                fig = px.histogram(res, x="Predicted Yield", nbins=20, title="Batch Distribution",
+                                   color_discrete_sequence=["#16a34a"], template="plotly_white")
+                st.plotly_chart(fig, use_container_width=True)
+                c1,c2 = st.columns(2)
+                c1.download_button("📥 CSV", res.to_csv(index=False), "batch.csv", "text/csv", use_container_width=True)
+                xb = io.BytesIO()
+                with pd.ExcelWriter(xb, engine="openpyxl") as w: res.to_excel(w, index=False, sheet_name="Predictions")
+                xb.seek(0)
+                c2.download_button("📊 Excel", xb, "batch.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                if errors:
+                    with st.expander(f"❌ {len(errors)} failed"): st.dataframe(pd.DataFrame(errors), use_container_width=True)
+            else:
+                st.error("No predictions found. Check Female/Male/Location values match the database.")
 
-        missing_cols = [c for c in ["Female", "Male", "Location"]
-                        if c not in input_df.columns]
-        if missing_cols:
-            st.error(f"Missing columns: {missing_cols}")
-        else:
-            if st.button("🔮 Predict All", type="primary", use_container_width=True):
-                results, errors = [], []
-                progress = st.progress(0)
-                status   = st.empty()
-                total    = len(input_df)
+# TAB 9 — Model Insights (NEW) ────────────────────────────────
+with tab9:
+    st.subheader("🧠 Model Insights")
+    st.markdown('<div class="info-pill">Understand what the model learned and how NeuroCrop compares to standard GBLUP tools.</div>', unsafe_allow_html=True)
+    cl, cr = st.columns(2)
 
-                for i, row in input_df.iterrows():
-                    p1  = str(row["Female"]).strip()
-                    p2  = str(row["Male"]).strip()
-                    loc = str(row["Location"]).strip()
-                    p   = lookup(p1, p2, loc)
+    with cl:
+        st.markdown("#### Feature Importance")
+        fi_df = pd.DataFrame({"Feature":["Genetics (SNP PCA)","Plant Traits","Season Weather","Critical-Period Weather","Soil"],"Importance %":[41.1,23.7,18.9,16.3,0.0]})
+        fig = px.bar(fi_df, x="Importance %", y="Feature", orientation="h", color="Importance %",
+                     color_continuous_scale="Greens", template="plotly_white", title="XGBoost Feature Importance")
+        fig.update_layout(height=280, showlegend=False, plot_bgcolor="#f8fdf9", yaxis={"categoryorder":"total ascending"})
+        st.plotly_chart(fig, use_container_width=True)
 
-                    if p:
-                        results.append({
-                            "Female":          p1,
-                            "Male":            p2,
-                            "Location":        loc,
-                            "Predicted Yield": p,
-                            "Percentile":      get_percentile(p, loc),
-                            "Category":        category(p),
-                        })
-                    else:
-                        errors.append({"Female": p1, "Male": p2,
-                                       "Location": loc, "Error": "Not found"})
+        st.markdown("#### 2017 vs 5-Year Model")
+        perf = pd.DataFrame({"Version":["2017 (RF)","2014-2018 (XGBoost)"],"CV R2":[0.572,0.355],"Test R2":[0.635,0.361]})
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(name="CV R2",   x=perf["Version"], y=perf["CV R2"],   marker_color="#16a34a"))
+        fig2.add_trace(go.Bar(name="Test R2", x=perf["Version"], y=perf["Test R2"], marker_color="#4ade80"))
+        fig2.update_layout(barmode="group", template="plotly_white", height=280, plot_bgcolor="#f8fdf9",
+                           yaxis_title="R2", yaxis_range=[0,0.75], title="Model Performance Comparison")
+        st.plotly_chart(fig2, use_container_width=True)
 
-                    progress.progress((i + 1) / total)
-                    status.text(f"Processing {i + 1}/{total}...")
+    with cr:
+        st.markdown("#### What Changed: 2017 → 2014–2018")
+        chg = [("Samples","2,867","46,686","16x more"),("Years","1","5","Multi-year G×E"),
+               ("Locations","23","38","+15 environments"),("Hybrids","654","2,912","4.5x diversity"),
+               ("Algorithm","RF","XGBoost","Better G×E handling"),("SNP strategy","Concat","Mid-parent","Half RAM"),
+               ("CV (honest)","0.572*","0.355","*had data leakage"),("Predictions","~100k","2,994,894","Full coverage")]
+        st.dataframe(pd.DataFrame(chg, columns=["Metric","2017","2014-2018","Reason"]), use_container_width=True, hide_index=True)
 
-                progress.empty()
-                status.empty()
+        st.markdown("#### NeuroCrop vs Industry GBLUP")
+        st.markdown('<div class="info-pill"><strong>Standard GBLUP</strong> (Pioneer, Bayer): pedigree + genomics. No environment data.<br><br><strong>NeuroCrop</strong>: adds actual field-level climate (daily temp, rainfall, solar radiation May-Sep + Jun-Aug) + soil. Environment contributes 35% of predictive power.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="warn-pill">CV R2 dropped from 0.572 (2017) to 0.355 (5-year) because the old CV had data leakage. Current 0.355 is the honest number. Published GBLUP benchmarks on G2F: R2 = 0.35-0.55.</div>', unsafe_allow_html=True)
 
-                if results:
-                    res_df = (pd.DataFrame(results)
-                              .sort_values("Predicted Yield", ascending=False)
-                              .reset_index(drop=True))
-                    res_df.index += 1
+# TAB 10 — About (NEW) ────────────────────────────────────────
+with tab10:
+    st.subheader("ℹ️ About NeuroCrop")
+    ca, cb = st.columns([2,1])
+    with ca:
+        st.markdown("""
+        <div class="about-section">
+          <h4>What is NeuroCrop?</h4>
+          A generative breeding platform predicting maize hybrid grain yield before field trials,
+          using genomic SNPs, weather, soil, and plant traits. Trained on the public G2F dataset:
+          5 years (2014-2018), 38 US locations, 2,912 hybrids, 2,994,894 pre-computed predictions.
+        </div>
+        <div class="about-section">
+          <h4>Technical Architecture</h4>
+          <strong>Genomics:</strong> Top 10k SNPs (variance filter from 437k-SNP VCF). Mid-parent average compressed to 20 PCA components via TruncatedSVD.<br><br>
+          <strong>Environment:</strong> Season weather (May-Sep) + critical-period weather (Jun-Aug) + soil = 27 features.<br><br>
+          <strong>Model:</strong> XGBoost (400 trees, lr=0.03). Per-location z-score normalisation. Honest 3-fold CV.<br><br>
+          <strong>Inference:</strong> 2,994,894 pre-computed predictions stored in a 30 MB .csv.gz. No model inference at runtime.
+        </div>
+        <div class="about-section">
+          <h4>Dataset</h4>
+          Public G2F (Genomes to Fields) initiative. DOI: 10.25739/ragt-7213<br>
+          VCF: inbreds_G2F_2014-2023_437k.vcf — 2,193 inbreds, 437,214 SNPs
+        </div>
+        """, unsafe_allow_html=True)
+    with cb:
+        st.markdown("""
+        <div class="about-section">
+          <h4>Author</h4>
+          <strong>Abdul Manan</strong><br>
+          Plant Breeder · ML Researcher<br>
+          Generative Breeding Startup<br><br>
+          📧 abdulmanan2287@gmail.com<br>
+          🔗 <a href="https://www.linkedin.com/in/abdul-manan-0aa546332/">LinkedIn</a><br>
+          💻 <a href="https://github.com/manan348">GitHub</a>
+        </div>
+        <div class="about-section">
+          <h4>Metrics</h4>
+          CV R² = 0.355 (honest)<br>
+          Test R² = 0.361<br>
+          Samples = 46,686<br>
+          Locations = 38<br>
+          Hybrids = 2,912<br>
+          Years = 5
+        </div>
+        <div class="about-section">
+          <h4>Roadmap</h4>
+          ✅ Multi-year model<br>
+          ✅ 2.99M predictions<br>
+          ⬜ FastAPI endpoint<br>
+          ⬜ Soybean pipeline<br>
+          ⬜ Breeding recommender<br>
+          ⬜ B2B API customers
+        </div>
+        """, unsafe_allow_html=True)
 
-                    st.success(f"✅ {len(results)} predictions completed")
-                    if errors:
-                        st.warning(f"⚠️ {len(errors)} rows not found in database")
-
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("Best Yield",    f"{res_df['Predicted Yield'].max():.1f} bu/A")
-                    m2.metric("Average Yield", f"{res_df['Predicted Yield'].mean():.1f} bu/A")
-                    m3.metric("Worst Yield",   f"{res_df['Predicted Yield'].min():.1f} bu/A")
-
-                    st.dataframe(res_df, use_container_width=True)
-
-                    fig = px.histogram(
-                        res_df, x="Predicted Yield", nbins=20,
-                        title="Yield Distribution — Batch Results",
-                        color_discrete_sequence=["#1a7a45"],
-                        template="plotly_white",
-                    )
-                    fig.update_layout(plot_bgcolor="#f8fdf9")
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    c1, c2 = st.columns(2)
-                    c1.download_button(
-                        "📥 Download Results CSV",
-                        res_df.to_csv(index=False),
-                        "neurocrop_batch_predictions.csv", "text/csv",
-                        use_container_width=True,
-                    )
-                    excel_buf = io.BytesIO()
-                    with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
-                        res_df.to_excel(writer, index=False, sheet_name="Predictions")
-                    excel_buf.seek(0)
-                    c2.download_button(
-                        "📊 Download Results Excel",
-                        excel_buf,
-                        "neurocrop_batch_predictions.xlsx",
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                    )
-
-                    if errors:
-                        with st.expander(f"❌ {len(errors)} failed rows"):
-                            st.dataframe(pd.DataFrame(errors), use_container_width=True)
-                else:
-                    st.error("No predictions found. Check Female/Male/Location values match the database.")
-
-# ── Footer ─────────────────────────────────────────────────────
+# ── Footer ────────────────────────────────────────────────────
 st.markdown("---")
 st.markdown(
-    f"**NeuroCrop** · Generative Breeding Platform · {DATASET} · {MODEL_NAME} · "
+    f"**NeuroCrop** · Generative Breeding · {DATASET} · {MODEL_NAME} · "
     f"CV R² = {CV_R2_NORM:.3f} · Test R² = {TEST_R2_NORM:.3f} · "
-    f"{N_SAMPLES:,} samples · {N_LOCATIONS} locations · **Abdul Manan**"
+    f"{N_SAMPLES:,} samples · {N_LOCATIONS} locations · "
+    "**Abdul Manan** · [GitHub](https://github.com/manan348) · "
+    "[LinkedIn](https://www.linkedin.com/in/abdul-manan-0aa546332/)"
 )
