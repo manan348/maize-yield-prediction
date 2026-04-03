@@ -95,13 +95,11 @@ def load_data() -> pd.DataFrame:
     # Reads .csv.gz — pandas auto-detects gzip, no extra code needed
     csv_path = ROOT / "outputs" / "predictions" / "all_predictions.csv.gz"
     if not csv_path.exists():
-        csv_path = ROOT / "outputs" / "predictions" / "all_predictions.csv"
-    if not csv_path.exists():
         st.error(
             f"**all_predictions.csv.gz not found.**\n\n"
-            f"Expected location: `outputs/all_predictions.csv` "
+            f"Expected location: `outputs/predictions/all_predictions.csv.gz` "
             f"(relative to repo root).\n\n"
-            f"Run Cell 37 in Colab (generates .csv then compresses to .csv.gz), "
+            f"Run Cell 37 in Colab to generate and compress the file, "
             f"then push outputs/predictions/all_predictions.csv.gz to GitHub."
         )
         st.stop()
