@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -241,15 +240,198 @@ def make_pdf(p1, p2, loc, pred, loc_rows, percentile):
     doc.build(s); buf.seek(0); return buf
 
 # ══════════════════════════════════════════════════════════════
-# HEADER
+# HEADER  — animated SVG logo
 # ══════════════════════════════════════════════════════════════
 st.markdown(f"""
-<div class="hero">
-  <h1>🌽 NeuroCrop</h1>
-  <div class="sub">GENERATIVE BREEDING PLATFORM  ·  MAIZE HYBRID YIELD PREDICTION</div>
-  <div>
-    <span class="tag">XGBoost</span><span class="tag">Genomics + Environment</span>
-    <span class="tag">5-Year Multi-Location</span><span class="tag">G×E Modelling</span>
+<style>
+  /* ── Logo animation keyframes ── */
+  @keyframes logoFadeIn  {{ from {{ opacity:0; transform:translateY(-10px) }} to {{ opacity:1; transform:translateY(0) }} }}
+  @keyframes pulseGlow   {{ 0%,100% {{ filter:drop-shadow(0 0 6px rgba(74,222,128,0.5))  }} 50% {{ filter:drop-shadow(0 0 18px rgba(74,222,128,0.9)) }} }}
+  @keyframes spinDNA     {{ from {{ transform:rotate(0deg) }} to {{ transform:rotate(360deg) }} }}
+  @keyframes waveStalk   {{ 0%,100% {{ d:path("M 50 110 Q 48 90 50 70 Q 52 50 50 30") }} 50% {{ d:path("M 50 110 Q 54 90 50 70 Q 46 50 50 30") }} }}
+  @keyframes particleDrift {{
+    0%   {{ transform: translate(0px, 0px) opacity(1);  opacity:1  }}
+    100% {{ transform: translate(var(--dx), var(--dy)); opacity:0  }}
+  }}
+  @keyframes leafSway {{ 0%,100% {{ transform: rotate(-8deg) }} 50% {{ transform: rotate(8deg) }} }}
+  @keyframes counterLeafSway {{ 0%,100% {{ transform: rotate(6deg) }} 50% {{ transform: rotate(-6deg) }} }}
+  @keyframes blink {{ 0%,90%,100% {{ opacity:1 }} 95% {{ opacity:0.2 }} }}
+  @keyframes scanline {{
+    0%   {{ transform: translateY(-100%) }}
+    100% {{ transform: translateY(100%)  }}
+  }}
+  @keyframes neuralPulse {{ 0%,100% {{ stroke-opacity:.2 }} 50% {{ stroke-opacity:.8 }} }}
+
+  .neurocrop-hero {{
+    background: linear-gradient(135deg, #020f07 0%, #071a0e 35%, #0d3320 70%, #14532d 100%);
+    border-radius: 20px; padding: 36px 48px 32px; margin-bottom: 28px;
+    position: relative; overflow: hidden;
+    border: 1px solid rgba(74,222,128,0.15);
+  }}
+  /* subtle scanline overlay */
+  .neurocrop-hero::after {{
+    content:""; position:absolute; inset:0; border-radius:20px; pointer-events:none;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(74,222,128,0.015) 2px, rgba(74,222,128,0.015) 4px
+    );
+  }}
+  /* right-side radial glow */
+  .neurocrop-hero::before {{
+    content:""; position:absolute; top:0; right:0; bottom:0; width:50%;
+    background: radial-gradient(ellipse at 85% 50%, rgba(74,222,128,0.10) 0%, transparent 65%);
+    pointer-events:none;
+  }}
+
+  .hero-inner {{ display:flex; align-items:center; gap:28px; position:relative; z-index:1; }}
+
+  /* ── The SVG logo wrapper ── */
+  .logo-wrap {{
+    flex-shrink:0; width:88px; height:88px; position:relative;
+    animation: logoFadeIn .8s ease both;
+  }}
+  .logo-wrap svg {{ width:100%; height:100%; }}
+
+  /* ── Text block ── */
+  .hero-text {{ flex:1; }}
+  .hero-text h1 {{
+    color:#f0fdf4; font-size:2.55rem; margin:0 0 4px 0;
+    font-weight:800; letter-spacing:-0.025em;
+    animation: logoFadeIn .8s ease .15s both;
+  }}
+  .hero-text h1 span {{ color:#4ade80; }}
+  .hero-text .sub {{
+    color:#a7f3c0; font-size:0.88rem; font-weight:400;
+    letter-spacing:.07em; margin-bottom:14px;
+    animation: logoFadeIn .8s ease .3s both;
+  }}
+  .hero-text .tags {{ animation: logoFadeIn .8s ease .45s both; }}
+  .hero .tag {{
+    display:inline-block;
+    background:rgba(74,222,128,.15); border:1px solid rgba(74,222,128,.4);
+    color:#6ee7a0; font-size:.72rem; font-weight:600; letter-spacing:.08em;
+    padding:4px 12px; border-radius:20px; margin-right:6px; margin-top:6px;
+    text-transform:uppercase; cursor:default; transition:all .25s ease;
+  }}
+  .hero .tag:hover {{
+    background:rgba(74,222,128,.30); border-color:#4ade80;
+    transform:translateY(-2px); box-shadow:0 4px 14px rgba(74,222,128,.25);
+    color:#bbf7d0;
+  }}
+
+  /* DNA ring animation */
+  .dna-ring {{ transform-origin:44px 44px; animation: spinDNA 12s linear infinite; }}
+  /* leaf sway */
+  .leaf-r {{ transform-origin:50px 70px; animation: leafSway 3s ease-in-out infinite; }}
+  .leaf-l {{ transform-origin:50px 70px; animation: counterLeafSway 3.4s ease-in-out infinite; }}
+  /* glow pulse on whole logo */
+  .logo-glow {{ animation: pulseGlow 3s ease-in-out infinite; }}
+  /* neural connection lines */
+  .n-line {{ animation: neuralPulse 2.5s ease-in-out infinite; }}
+  .n-line:nth-child(2) {{ animation-delay:.5s }}
+  .n-line:nth-child(3) {{ animation-delay:1s }}
+
+  /* hover: speed up spin & intensify glow */
+  .logo-wrap:hover .dna-ring {{ animation-duration:3s; }}
+  .logo-wrap:hover .logo-glow {{ filter:drop-shadow(0 0 24px rgba(74,222,128,1)); }}
+</style>
+
+<div class="neurocrop-hero hero">
+  <div class="hero-inner">
+
+    <!-- ═══ ANIMATED SVG LOGO ═══ -->
+    <div class="logo-wrap">
+      <svg viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" class="logo-glow">
+        <defs>
+          <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stop-color="#0d3320"/>
+            <stop offset="100%" stop-color="#020f07"/>
+          </radialGradient>
+          <radialGradient id="kernelGrad" cx="40%" cy="35%" r="60%">
+            <stop offset="0%"   stop-color="#86efac"/>
+            <stop offset="100%" stop-color="#15803d"/>
+          </radialGradient>
+          <linearGradient id="stalkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stop-color="#166534"/>
+            <stop offset="100%" stop-color="#4ade80"/>
+          </linearGradient>
+          <!-- clip to circle -->
+          <clipPath id="circleClip">
+            <circle cx="44" cy="44" r="40"/>
+          </clipPath>
+        </defs>
+
+        <!-- Outer ring background -->
+        <circle cx="44" cy="44" r="43" fill="url(#bgGrad)" stroke="rgba(74,222,128,0.35)" stroke-width="1.5"/>
+
+        <!-- Spinning DNA / helix ring (dashed arc) -->
+        <g class="dna-ring">
+          <circle cx="44" cy="44" r="36"
+            fill="none" stroke="rgba(74,222,128,0.18)" stroke-width="1"
+            stroke-dasharray="4 6"/>
+          <!-- four evenly-spaced dots on the ring -->
+          <circle cx="44" cy="8"  r="2.5" fill="#4ade80" opacity=".7"/>
+          <circle cx="80" cy="44" r="2.5" fill="#4ade80" opacity=".7"/>
+          <circle cx="44" cy="80" r="2.5" fill="#4ade80" opacity=".7"/>
+          <circle cx="8"  cy="44" r="2.5" fill="#4ade80" opacity=".7"/>
+        </g>
+
+        <!-- Maize stalk -->
+        <path d="M 44 78 Q 42 62 44 48 Q 46 34 44 18"
+              stroke="url(#stalkGrad)" stroke-width="3.5" fill="none"
+              stroke-linecap="round"/>
+
+        <!-- Leaf right -->
+        <g class="leaf-r">
+          <path d="M 46 58 Q 62 52 66 40 Q 58 48 46 52 Z"
+                fill="#16a34a" opacity=".9"/>
+        </g>
+        <!-- Leaf left -->
+        <g class="leaf-l">
+          <path d="M 42 50 Q 26 44 22 32 Q 30 42 42 46 Z"
+                fill="#15803d" opacity=".85"/>
+        </g>
+
+        <!-- Maize cob (ear) -->
+        <rect x="38" y="32" width="12" height="22" rx="6"
+              fill="url(#kernelGrad)" opacity=".95"/>
+        <!-- Kernel rows -->
+        <line x1="44" y1="33" x2="44" y2="53" stroke="rgba(22,101,52,.6)" stroke-width="1"/>
+        <line x1="40" y1="35" x2="40" y2="51" stroke="rgba(22,101,52,.5)" stroke-width=".8"/>
+        <line x1="48" y1="35" x2="48" y2="51" stroke="rgba(22,101,52,.5)" stroke-width=".8"/>
+        <!-- Silk tassel -->
+        <line x1="42" y1="32" x2="40" y2="24" stroke="#86efac" stroke-width="1"   opacity=".8"/>
+        <line x1="44" y1="32" x2="44" y2="22" stroke="#a7f3c0" stroke-width="1.2" opacity=".9"/>
+        <line x1="46" y1="32" x2="48" y2="24" stroke="#86efac" stroke-width="1"   opacity=".8"/>
+
+        <!-- Neural / genomic connection dots -->
+        <circle cx="28" cy="28" r="3" fill="#4ade80" opacity=".5"/>
+        <circle cx="60" cy="28" r="3" fill="#4ade80" opacity=".5"/>
+        <circle cx="26" cy="60" r="3" fill="#4ade80" opacity=".4"/>
+        <circle cx="62" cy="60" r="3" fill="#4ade80" opacity=".4"/>
+        <!-- Lines connecting them to cob -->
+        <line x1="28" y1="28" x2="40" y2="38" stroke="#4ade80" stroke-width=".8" opacity=".25" class="n-line"/>
+        <line x1="60" y1="28" x2="48" y2="38" stroke="#4ade80" stroke-width=".8" opacity=".25" class="n-line"/>
+        <line x1="26" y1="60" x2="40" y2="50" stroke="#4ade80" stroke-width=".8" opacity=".20" class="n-line"/>
+        <line x1="62" y1="60" x2="48" y2="50" stroke="#4ade80" stroke-width=".8" opacity=".20" class="n-line"/>
+
+        <!-- NC monogram bottom-left -->
+        <text x="11" y="78" font-family="'Fraunces',serif" font-size="9"
+              font-weight="800" fill="#4ade80" opacity=".7" letter-spacing=".5">NC</text>
+      </svg>
+    </div>
+    <!-- ═══ END LOGO ═══ -->
+
+    <div class="hero-text">
+      <h1>Neuro<span>Crop</span></h1>
+      <div class="sub">GENERATIVE BREEDING PLATFORM  ·  MAIZE HYBRID YIELD PREDICTION</div>
+      <div class="tags">
+        <span class="tag">XGBoost</span>
+        <span class="tag">Genomics + Environment</span>
+        <span class="tag">5-Year Multi-Location</span>
+        <span class="tag">G×E Modelling</span>
+      </div>
+    </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -278,7 +460,7 @@ location = st.sidebar.selectbox("Location",      locations)
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"**Model:** {MODEL_NAME}  \n**CV R²:** {CV_R2_NORM:.3f}  \n**Test R²:** {TEST_R2_NORM:.3f}  \n**Samples:** {N_SAMPLES:,}  \n**Hybrids:** {N_HYBRIDS:,}")
 st.sidebar.markdown("---")
-st.sidebar.caption("NeuroCrop · Abdul Manan")
+st.sidebar.markdown('<div style="text-align:center;padding:8px 0;font-size:.78rem;color:#86efac;letter-spacing:.06em;opacity:.8;">🌿 NeuroCrop · Abdul Manan</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
 # TABS — 10 total (6 existing + 4 new)
