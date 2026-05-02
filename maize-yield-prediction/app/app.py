@@ -15,7 +15,8 @@ from reportlab.platypus      import (SimpleDocTemplate, Paragraph,
 from reportlab.lib           import colors
 
 import sys
-ROOT = Path(__file__).resolve().parent   # ← was .parents[1] (went UP one level, wrong)
+APP_DIR  = Path(__file__).resolve().parent        # …/maize-yield-prediction/app/
+ROOT     = APP_DIR.parent                             # …/maize-yield-prediction/
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
@@ -779,6 +780,8 @@ with tab2:
             {"Location": l, "Yield": v, "Percentile": pct_rank(v, l), "Category": cat(v)}
             for l in locations if (v := lookup(p1, p2, l))
         ]
+        if not rows:
+            return pd.DataFrame(columns=["Location", "Yield", "Percentile", "Category"])
         return pd.DataFrame(rows).sort_values("Yield", ascending=False).reset_index(drop=True)
 
     res = _best_locs(female, male)
