@@ -14,9 +14,7 @@ from reportlab.platypus      import (SimpleDocTemplate, Paragraph,
 from reportlab.lib           import colors
 
 import sys
-# Use .parent if app.py is at repo_root/app.py
-# Use .parents[1] if app.py is at repo_root/something/app.py
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
@@ -36,7 +34,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Global CSS + Animation Keyframes (plain string — no f-prefix) ──
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@300;600;800&family=Instrument+Sans:wght@300;400;500;600&display=swap');
