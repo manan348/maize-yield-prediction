@@ -148,30 +148,29 @@ males     = sorted(df["Male"].unique().tolist())
 locations = sorted(df["Location"].unique().tolist())
 
 
-@st.cache_data(show_spinner=False)
-def build_lookup(_df: pd.DataFrame) -> dict:
-    # Strip whitespace from column names defensively
-    _df = _df.rename(columns=lambda c: c.strip())
-    required = {"Female", "Male", "Location", "Yield"}
-    missing = required - set(_df.columns)
-    if missing:
-        st.error(f"❌ Data file is missing columns: {missing}. Check your CSV headers.")
-        return {}
-    lkp = {}
-    for row in _df.itertuples(index=False):
-        lkp[(row.Female, row.Male, row.Location)] = row.Yield
-        lkp[(row.Male, row.Female, row.Location)] = row.Yield
-    return lkp
+# ── Memory-efficient lookup: indexed DataFrame instead of a giant dict ──
+# The old dict held ~5.8M entries and consumed ~700MB RAM, crashing Streamlit Cloud.
+# A sorted MultiIndex DataFrame uses ~60% less memory and is equally fast via .loc[].
+df.columns = [c.strip() for c in df.columns]   # defensive: strip whitespace from headers
+_required = {"Female", "Male", "Location", "Yield"}
+_missing  = _required - set(df.columns)
+if _missing:
+    st.error(f"❌ Data file is missing columns: {_missing}. Check your CSV headers.")
+    st.stop()
 
-
-LOOKUP = build_lookup(df)
+df_indexed = df.set_index(["Female", "Male", "Location"]).sort_index()
 
 
 def lookup(p1: str, p2: str, loc: str):
-    v = LOOKUP.get((p1, p2, loc))
-    if v is None:
-        v = LOOKUP.get((p2, p1, loc))
-    return round(float(v), 2) if v is not None else None
+    for f, m in [(p1, p2), (p2, p1)]:
+        try:
+            v = df_indexed.loc[(f, m, loc), "Yield"]
+            if hasattr(v, "iloc"):   # handles duplicate entries — take first
+                v = v.iloc[0]
+            return round(float(v), 2)
+        except KeyError:
+            continue
+    return None
 
 
 @st.cache_data(show_spinner=False)
@@ -183,7 +182,7 @@ def overall_stats():
 OV = overall_stats()
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=3600)
 def build_loc_yields():
     return {loc: df[df["Location"] == loc]["Yield"].values for loc in locations}
 
@@ -221,7 +220,22 @@ def cross_locations(p1: str, p2: str) -> list:
     return sorted(rows, key=lambda x: x["Yield"], reverse=True)
 
 
-@st.cache_data(show_spinner="Computing stability metrics…")
+@st.cache_data(show_spinner=False, ttl=3600)
+def location_stats():
+    return df.groupby("Location")["Yield"].agg(
+        Mean="mean", Std="std", N="count"
+    ).reset_index().sort_values("Mean", ascending=False)
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def parent_stats(col_name: str):
+    ps = df.groupby(col_name)["Yield"].mean()\
+           .sort_values(ascending=False).head(20).reset_index()
+    ps.columns = [col_name, "Mean Yield"]
+    return ps
+
+
+@st.cache_data(show_spinner="Computing stability metrics…", ttl=3600)
 def stability_df():
     g = df.groupby(["Female", "Male"])["Yield"]
     t = g.agg(Mean_Yield="mean", Std_Yield="std", N_Locs="count").reset_index()
@@ -547,10 +561,10 @@ with tab1:
                                      ("⚡ Critical Weather", 16.3, "#fb923c")]:
                 st.markdown(f'<div style="margin:8px 0;"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:3px;"><span style="color:#d1fae5;">{name}</span><span style="color:{col_};font-weight:700;">{val}%</span></div><div class="pbar-wrap"><div class="pbar-fill" style="--w:{val}%;background:{col_};opacity:.85;"></div></div></div>', unsafe_allow_html=True)
         st.markdown("---")
+        _cross = cross_locations(female, male)   # call once, reuse below
         with st.expander("🗺️ Quick Location Scout — where else does this cross perform?", expanded=False):
-            scout = cross_locations(female, male)
-            if scout:
-                s_df = pd.DataFrame(scout)
+            if _cross:
+                s_df = pd.DataFrame(_cross)
                 fig_s = px.bar(s_df, x="Location", y="Yield", color="Yield",
                                color_continuous_scale="RdYlGn", template="plotly_dark",
                                text="Yield", title=f"{female} × {male} across all locations")
@@ -563,7 +577,7 @@ with tab1:
                                     plot_bgcolor="#0d1f13", paper_bgcolor="#0d1f13",
                                     font=dict(color="#e2f5e9", size=12))
                 st.plotly_chart(fig_s, use_container_width=True)
-        pdf = make_pdf(female, male, location, pred, cross_locations(female, male), p)
+        pdf = make_pdf(female, male, location, pred, _cross, p)
         st.download_button("📄 Download PDF Report", pdf,
                            f"neurocrop_{female}_{male}_{location}.pdf",
                            "application/pdf", use_container_width=True)
@@ -846,7 +860,7 @@ with tab7:
         fig2.update_layout(height=320, paper_bgcolor="#0d1f13", font=dict(color="#e2f5e9", size=13))
         st.plotly_chart(fig2, use_container_width=True)
     with et2:
-        ls = df.groupby("Location")["Yield"].agg(Mean="mean", Std="std", N="count").reset_index().sort_values("Mean", ascending=False)
+        ls = location_stats()
         fig = px.bar(ls, x="Location", y="Mean", error_y="Std", color="Mean",
                      color_continuous_scale="RdYlGn",
                      title="Mean Predicted Yield by Location", template="plotly_dark")
@@ -858,8 +872,7 @@ with tab7:
     with et3:
         for label, col_name, palette in [("Female", "Female", "Greens"), ("Male", "Male", "Blues")]:
             st.markdown(f"**Top 20 {label} Parents by Mean Yield**")
-            ps = df.groupby(col_name)["Yield"].mean().sort_values(ascending=False).head(20).reset_index()
-            ps.columns = [col_name, "Mean Yield"]
+            ps = parent_stats(col_name)
             fig = px.bar(ps, x=col_name, y="Mean Yield", color="Mean Yield",
                          color_continuous_scale=palette,
                          title=f"Top 20 {label} Parents", template="plotly_dark")
