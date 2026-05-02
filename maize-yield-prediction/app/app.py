@@ -16,10 +16,12 @@ from reportlab.platypus      import (SimpleDocTemplate, Paragraph,
 from reportlab.lib           import colors
 
 import sys
-APP_DIR  = Path(__file__).resolve().parent
-ROOT     = APP_DIR.parent
-if str(ROOT / "src") not in sys.path:
-    sys.path.insert(0, str(ROOT / "src"))
+APP_DIR  = Path(__file__).resolve().parent   # .../maize-yield-prediction/app/
+ROOT     = APP_DIR.parent                     # .../maize-yield-prediction/
+DATA_DIR = ROOT / "outputs" / "predictions"   # explicit constant — avoids repeating path fragments
+SRC_DIR  = ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 CV_R2_NORM   = 0.355
 TEST_R2_NORM = 0.361
@@ -85,9 +87,10 @@ st.markdown("""
 # ── Data loading: local → GitHub raw → demo ──────────────────
 @st.cache_data(show_spinner="Loading prediction database…", ttl=3600)
 def load_data():
-    parquet_path = ROOT / "outputs" / "predictions" / "all_predictions.parquet"
-    gz_path      = ROOT / "outputs" / "predictions" / "all_predictions.csv.gz"
-    csv_path     = ROOT / "outputs" / "predictions" / "all_predictions.csv"
+    # DATA_DIR = ROOT/outputs/predictions — defined at module level
+    parquet_path = DATA_DIR / "all_predictions.parquet"
+    gz_path      = DATA_DIR / "all_predictions.csv.gz"
+    csv_path     = DATA_DIR / "all_predictions.csv"
 
     # 1. Local parquet (fastest on repeat runs)
     if parquet_path.exists():
@@ -115,7 +118,7 @@ def load_data():
         df = pd.read_csv(GITHUB_RAW_URL, compression="gzip")
         # Try to save locally so next restart is instant
         try:
-            gz_path.parent.mkdir(parents=True, exist_ok=True)
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
             df.to_csv(gz_path, index=False, compression="gzip")
         except Exception:
             pass
@@ -147,6 +150,13 @@ locations = sorted(df["Location"].unique().tolist())
 
 @st.cache_data(show_spinner=False)
 def build_lookup(_df: pd.DataFrame) -> dict:
+    # Strip whitespace from column names defensively
+    _df = _df.rename(columns=lambda c: c.strip())
+    required = {"Female", "Male", "Location", "Yield"}
+    missing = required - set(_df.columns)
+    if missing:
+        st.error(f"❌ Data file is missing columns: {missing}. Check your CSV headers.")
+        return {}
     lkp = {}
     for row in _df.itertuples(index=False):
         lkp[(row.Female, row.Male, row.Location)] = row.Yield
@@ -165,12 +175,12 @@ def lookup(p1: str, p2: str, loc: str):
 
 
 @st.cache_data(show_spinner=False)
-def ov():
+def overall_stats():
     return {"mean": df["Yield"].mean(), "std": df["Yield"].std(),
             "min": df["Yield"].min(), "max": df["Yield"].max(), "n": len(df)}
 
 
-OV = ov()
+OV = overall_stats()
 
 
 @st.cache_data(show_spinner=False)
@@ -193,10 +203,15 @@ def cat(y: float) -> str:
 
 
 def strip_emoji(text: str) -> str:
-    return re.sub(r'[^\x00-\x7F]+', '', text).strip()
+    """Remove emoji/symbol characters while preserving accented Latin letters."""
+    import unicodedata
+    return "".join(
+        ch for ch in text
+        if unicodedata.category(ch) not in {"So", "Sm", "Sk", "Sc", "Cs", "Co", "Cn"}
+    ).strip()
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=3600)
 def cross_locations(p1: str, p2: str) -> list:
     rows = []
     for loc in locations:
@@ -630,7 +645,7 @@ with tab3:
             if i in colors_map:
                 return f'<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="{colors_map[i]}" opacity=".9"/><text x="11" y="15.5" text-anchor="middle" font-size="11" font-weight="800" fill="#fff" font-family="sans-serif">{i+1}</text></svg>'
             return f'<span style="font-size:.75rem;color:#6b7280;font-weight:600;">#{i+1}</span>'
-        for i, row in cross_df.iterrows():
+        for i, (_, row) in enumerate(cross_df.iterrows()):
             clr   = "#4ade80" if row["Yield"] >= YIELD_HIGH else ("#fbbf24" if row["Yield"] >= YIELD_MEDIUM else "#f87171")
             bar_w = round((row["Yield"] - min_y) / (max_y - min_y + 0.01) * 100, 1) if max_y > min_y else 80
             st.markdown(f'<div class="fancy-row"><span style="width:28px;flex-shrink:0;display:flex;align-items:center;">{rank_badge(i)}</span><span class="loc-name">{row["Cross"]}</span><div style="flex:3;"><div class="pbar-wrap" style="height:7px;"><div class="pbar-fill" style="--w:{bar_w}%;background:{clr};"></div></div></div><span style="font-family:\'Fraunces\',serif;font-size:1.05rem;color:{clr};font-weight:700;">{row["Yield"]:.1f}</span><span style="font-size:.72rem;color:#6b7280;margin-left:3px;">bu/A</span></div>', unsafe_allow_html=True)
@@ -872,7 +887,7 @@ with tab8:
         elif st.button("🔮 Run All Predictions", type="primary", use_container_width=True):
             results, errors = [], []
             prog = st.progress(0); stat = st.empty()
-            for i, row in inp.iterrows():
+            for i, (_, row) in enumerate(inp.iterrows()):
                 p1, p2, loc = str(row["Female"]).strip(), str(row["Male"]).strip(), str(row["Location"]).strip()
                 v = lookup(p1, p2, loc)
                 if v is not None:
