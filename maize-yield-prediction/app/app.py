@@ -417,17 +417,149 @@ for col, val, lbl in [
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# ── Sidebar ───────────────────────────────────────────────────
-st.sidebar.markdown("## 🔬 Select Hybrid")
+# ── Sidebar styling ───────────────────────────────────────────
+st.markdown("""
+<style>
+  /* Sidebar background */
+  [data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #020f07 0%, #071a0e 60%, #0d2218 100%) !important;
+    border-right: 1px solid rgba(74,222,128,0.12) !important;
+  }
+  [data-testid="stSidebar"] * { color: #d1fae5 !important; }
+
+  /* Sidebar selectbox */
+  [data-testid="stSidebar"] .stSelectbox label {
+    font-size: .72rem !important; text-transform: uppercase;
+    letter-spacing: .07em; color: #6ee7a0 !important; font-weight: 600 !important;
+  }
+  [data-testid="stSidebar"] [data-baseweb="select"] > div {
+    background: #0a1f12 !important;
+    border: 1.5px solid #1a4d2e !important;
+    border-radius: 10px !important;
+    transition: border-color .2s !important;
+  }
+  [data-testid="stSidebar"] [data-baseweb="select"] > div:hover {
+    border-color: #22c55e !important;
+  }
+
+  /* Sidebar stat pill */
+  .sb-stat {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; border-radius: 10px; margin: 5px 0;
+    background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.1);
+    transition: background .2s, border-color .2s;
+  }
+  .sb-stat:hover { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); }
+  .sb-stat .sk { font-size: .72rem; text-transform: uppercase;
+    letter-spacing: .06em; color: #6b7280 !important; }
+  .sb-stat .sv { font-size: .9rem; font-weight: 700; color: #4ade80 !important;
+    font-family: 'Fraunces', serif; }
+
+  /* Sidebar brand footer */
+  .sb-brand {
+    text-align: center; padding: 14px 8px 6px;
+    border-top: 1px solid rgba(74,222,128,0.12); margin-top: 8px;
+  }
+  .sb-brand .logo-txt { font-family: 'Fraunces', serif; font-size: 1.1rem;
+    font-weight: 800; color: #f0fdf4 !important; letter-spacing: -.01em; }
+  .sb-brand .logo-txt span { color: #4ade80 !important; }
+  .sb-brand .author { font-size: .72rem; color: #6b7280 !important;
+    letter-spacing: .05em; margin-top: 3px; }
+  .sb-brand .links a { color: #4ade80 !important; font-size: .75rem;
+    text-decoration: none; margin: 0 6px; }
+  .sb-brand .links a:hover { color: #86efac !important; text-decoration: underline; }
+
+  /* Prediction preview pill */
+  .sb-preview {
+    background: linear-gradient(135deg, #0a1f12, #0d2a18);
+    border: 1.5px solid rgba(74,222,128,0.25); border-radius: 12px;
+    padding: 12px 14px; margin: 10px 0; text-align: center;
+    transition: border-color .2s;
+  }
+  .sb-preview:hover { border-color: #4ade80; }
+  .sb-preview .sp-cross { font-size: .75rem; color: #6b7280 !important;
+    letter-spacing: .04em; margin-bottom: 4px; }
+  .sb-preview .sp-yield { font-family: 'Fraunces', serif; font-size: 1.6rem;
+    font-weight: 800; line-height: 1; }
+  .sb-preview .sp-unit { font-size: .78rem; color: #86efac !important; }
+</style>
+""", unsafe_allow_html=True)
+
+# ── Sidebar widgets ───────────────────────────────────────────
+st.sidebar.markdown("""
+<div style="padding:18px 4px 10px;">
+  <div style="font-family:'Fraunces',serif;font-size:1.05rem;font-weight:800;
+    color:#f0fdf4;letter-spacing:-.01em;">
+    🔬 Select <span style="color:#4ade80;">Hybrid</span>
+  </div>
+  <div style="font-size:.72rem;color:#6b7280;letter-spacing:.05em;margin-top:2px;">
+    CHOOSE PARENTS + LOCATION
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 default_f = females.index("B73")  if "B73"  in females else 0
 default_m = males.index("Mo17")   if "Mo17" in males   else 0
-female   = st.sidebar.selectbox("Female Parent", females, index=default_f)
-male     = st.sidebar.selectbox("Male Parent",   males,   index=default_m)
-location = st.sidebar.selectbox("Location",      locations)
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"**Model:** {MODEL_NAME}  \n**CV R²:** {CV_R2_NORM:.3f}  \n**Test R²:** {TEST_R2_NORM:.3f}  \n**Samples:** {N_SAMPLES:,}  \n**Hybrids:** {N_HYBRIDS:,}")
-st.sidebar.markdown("---")
-st.sidebar.markdown('<div style="text-align:center;padding:8px 0;font-size:.78rem;color:#86efac;letter-spacing:.06em;opacity:.8;">🌿 NeuroCrop · Abdul Manan</div>', unsafe_allow_html=True)
+female   = st.sidebar.selectbox("♀ Female Parent", females, index=default_f)
+male     = st.sidebar.selectbox("♂ Male Parent",   males,   index=default_m)
+location = st.sidebar.selectbox("📍 Location",      locations)
+
+# Live prediction preview in sidebar
+_prev = lookup(female, male, location)
+if _prev:
+    _pc   = cat(_prev)
+    _clr  = "#4ade80" if "High" in _pc else ("#fbbf24" if "Medium" in _pc else "#f87171")
+    _p    = pct_rank(_prev, location)
+    st.sidebar.markdown(f"""
+    <div class="sb-preview">
+      <div class="sp-cross">{female} × {male} @ {location}</div>
+      <div class="sp-yield" style="color:{_clr};">{_prev}</div>
+      <div class="sp-unit">bu / Acre &nbsp;·&nbsp; {_pc}</div>
+      <div style="margin-top:8px;">
+        <div style="font-size:.68rem;color:#6b7280;margin-bottom:3px;">Top {100-_p:.0f}% at location</div>
+        <div style="background:#0a1a10;border-radius:99px;height:5px;overflow:hidden;">
+          <div style="width:{_p}%;height:100%;background:{_clr};border-radius:99px;
+            animation:barGrow .8s cubic-bezier(.22,1,.36,1) both;"></div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.sidebar.markdown("""
+    <div class="sb-preview" style="border-color:rgba(220,38,38,.3);">
+      <div style="color:#f87171;font-size:.8rem;">❌ Not in database</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.sidebar.markdown("<div style='margin:6px 0 2px;'>", unsafe_allow_html=True)
+
+# Model stats
+stats = [
+    ("Model",    MODEL_NAME),
+    ("CV R²",    f"{CV_R2_NORM:.3f}"),
+    ("Test R²",  f"{TEST_R2_NORM:.3f}"),
+    ("Samples",  f"{N_SAMPLES:,}"),
+    ("Hybrids",  f"{N_HYBRIDS:,}"),
+    ("Locations",f"{N_LOCATIONS}"),
+    ("Years",    f"{N_YEARS}"),
+]
+for k, v in stats:
+    st.sidebar.markdown(f"""
+    <div class="sb-stat">
+      <span class="sk">{k}</span>
+      <span class="sv">{v}</span>
+    </div>""", unsafe_allow_html=True)
+
+st.sidebar.markdown("""
+<div class="sb-brand">
+  <div class="logo-txt">Neuro<span>Crop</span></div>
+  <div class="author">Abdul Manan · Plant Breeder + ML</div>
+  <div class="links" style="margin-top:6px;">
+    <a href="https://github.com/manan348" target="_blank">GitHub</a>
+    <a href="https://www.linkedin.com/in/abdul-manan-0aa546332/" target="_blank">LinkedIn</a>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
 # TABS — 10 total
