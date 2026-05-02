@@ -744,13 +744,17 @@ with tab2:
         b = res.iloc[0]
         # Top-3 winner podium
         pc = st.columns(3)
-        medals = ["🥇","🥈","🥉"]
+        medals_svg = [
+            '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#ca8a04"/><text x="14" y="19" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="sans-serif">1</text></svg>',
+            '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#6b7280"/><text x="14" y="19" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="sans-serif">2</text></svg>',
+            '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#b45309"/><text x="14" y="19" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="sans-serif">3</text></svg>',
+        ]
         for i in range(min(3, len(res))):
             row = res.iloc[i]
             clr = "#4ade80" if "High" in row["Category"] else ("#fbbf24" if "Medium" in row["Category"] else "#f87171")
             pc[i].markdown(f"""
             <div class="result-card" style="text-align:center;padding:20px 14px;">
-              <div style="font-size:1.6rem;">{medals[i]}</div>
+              <div>{medals_svg[i]}</div>
               <div style="font-weight:700;color:#d1fae5;font-size:.9rem;margin:6px 0;">{row['Location']}</div>
               <div class="big" style="font-size:2rem;color:{clr};">{row['Yield']}</div>
               <div class="unit">bu/A</div>
@@ -832,15 +836,26 @@ with tab3:
     if len(cross_df):
         max_y = cross_df["Yield"].max(); min_y = cross_df["Yield"].min()
 
+        # Badge SVGs for top 3
+        def rank_badge(i):
+            if i == 0:
+                return '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#ca8a04" opacity=".9"/><text x="11" y="15.5" text-anchor="middle" font-size="11" font-weight="800" fill="#fff" font-family="sans-serif">1</text></svg>'
+            elif i == 1:
+                return '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#6b7280" opacity=".9"/><text x="11" y="15.5" text-anchor="middle" font-size="11" font-weight="800" fill="#fff" font-family="sans-serif">2</text></svg>'
+            elif i == 2:
+                return '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#b45309" opacity=".85"/><text x="11" y="15.5" text-anchor="middle" font-size="11" font-weight="800" fill="#fff" font-family="sans-serif">3</text></svg>'
+            else:
+                return f'<span style="font-size:.75rem;color:#6b7280;font-weight:600;">#{i+1}</span>'
+
         # Animated leaderboard
         st.markdown(f"**{len(cross_df)} crosses shown**")
         for i, row in cross_df.iterrows():
             clr = "#4ade80" if row["Yield"]>=170 else ("#fbbf24" if row["Yield"]>=150 else "#f87171")
             bar_w = round((row["Yield"]-min_y)/(max_y-min_y+0.01)*100,1) if max_y>min_y else 80
-            medal = "🥇" if i==0 else ("🥈" if i==1 else ("🥉" if i==2 else f"#{i+1}"))
+            badge = rank_badge(i)
             st.markdown(f"""
             <div class="fancy-row" style="animation:cardPop .3s ease {i*0.03:.2f}s both;">
-              <span class="rank-num" style="width:28px;font-weight:700;color:#4ade80;">{medal}</span>
+              <span style="width:28px;flex-shrink:0;display:flex;align-items:center;">{badge}</span>
               <span class="loc-name">{row['Cross']}</span>
               <div style="flex:3;">
                 <div class="pbar-wrap" style="height:7px;">
