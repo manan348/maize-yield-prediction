@@ -15,9 +15,8 @@ from reportlab.platypus      import (SimpleDocTemplate, Paragraph,
 from reportlab.lib           import colors
 
 import sys
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT / "src") not in sys.path:
-    sys.path.insert(0, str(ROOT / "src"))
+# ROOT is the directory containing this script
+ROOT = Path(__file__).resolve().parent
 
 CV_R2_NORM   = 0.355
 TEST_R2_NORM = 0.361
@@ -207,9 +206,18 @@ def build_lookup(data_hash: int):
     data_hash is just len(df) used as a cheap cache-invalidation key.
     """
     lkp = {}
+    # Use index-safe column access in case column names have spaces/special chars
+    f_col  = df.columns.get_loc("Female")
+    m_col  = df.columns.get_loc("Male")
+    lo_col = df.columns.get_loc("Location")
+    y_col  = df.columns.get_loc("Yield")
     for row in df.itertuples(index=False):
-        lkp[(row.Female, row.Male, row.Location)] = row.Yield
-        lkp[(row.Male, row.Female, row.Location)] = row.Yield  # reciprocal
+        f  = row[f_col]
+        m  = row[m_col]
+        lo = row[lo_col]
+        y  = row[y_col]
+        lkp[(f, m, lo)] = y
+        lkp[(m, f, lo)] = y  # reciprocal
     return lkp
 
 LOOKUP = build_lookup(len(df))
@@ -731,10 +739,12 @@ with tab1:
         with st.expander("🗺️ Quick Location Scout — where else does this cross perform?", expanded=False):
             @st.cache_data(show_spinner=False)
             def _pdf_locs(p1, p2):
-                return sorted(
-                    [{"Location": l, "Yield": v} for l in locations if (v := lookup(p1, p2, l))],
-                    key=lambda x: x["Yield"], reverse=True
-                )
+                rows = []
+                for l in locations:
+                    v = lookup(p1, p2, l)
+                    if v is not None:
+                        rows.append({"Location": l, "Yield": v})
+                return sorted(rows, key=lambda x: x["Yield"], reverse=True)
             scout = _pdf_locs(female, male)
             if scout:
                 s_df  = pd.DataFrame(scout)
@@ -769,10 +779,11 @@ with tab2:
 
     @st.cache_data(show_spinner=False)
     def _best_locs(p1, p2):
-        rows = [
-            {"Location": l, "Yield": v, "Percentile": pct_rank(v, l), "Category": cat(v)}
-            for l in locations if (v := lookup(p1, p2, l))
-        ]
+        rows = []
+        for l in locations:
+            v = lookup(p1, p2, l)
+            if v is not None:
+                rows.append({"Location": l, "Yield": v, "Percentile": pct_rank(v, l), "Category": cat(v)})
         return pd.DataFrame(rows).sort_values("Yield", ascending=False).reset_index(drop=True)
 
     res = _best_locs(female, male)
