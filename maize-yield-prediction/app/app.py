@@ -14,7 +14,10 @@ from reportlab.platypus      import (SimpleDocTemplate, Paragraph,
 from reportlab.lib           import colors
 
 import sys
-ROOT = Path(__file__).resolve().parents[1]
+# parents[0] = the directory containing app.py (i.e. the repo root when the
+# file lives at repo_root/app.py).  Use parents[1] only if app.py is nested
+# one level deeper, e.g. repo_root/src/app.py.
+ROOT = Path(__file__).resolve().parent
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
@@ -248,7 +251,6 @@ st.markdown(f"""
   @keyframes logoFadeIn  {{ from {{ opacity:0; transform:translateY(-10px) }} to {{ opacity:1; transform:translateY(0) }} }}
   @keyframes pulseGlow   {{ 0%,100% {{ filter:drop-shadow(0 0 6px rgba(74,222,128,0.5))  }} 50% {{ filter:drop-shadow(0 0 18px rgba(74,222,128,0.9)) }} }}
   @keyframes spinDNA     {{ from {{ transform:rotate(0deg) }} to {{ transform:rotate(360deg) }} }}
-  @keyframes waveStalk   {{ 0%,100% {{ d:path("M 50 110 Q 48 90 50 70 Q 52 50 50 30") }} 50% {{ d:path("M 50 110 Q 54 90 50 70 Q 46 50 50 30") }} }}
   @keyframes particleDrift {{
     0%   {{ transform: translate(0px, 0px) opacity(1);  opacity:1  }}
     100% {{ transform: translate(var(--dx), var(--dy)); opacity:0  }}
